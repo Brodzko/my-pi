@@ -1,0 +1,110 @@
+{
+  "sessionMemory": "command",
+  "rules": [
+    { "matches": ["*rm -rf /*", "*rm -rf ~*", "*rm -rf .*"], "action": "reject" },
+    {
+      "matches": ["*mkfs*", "*dd if=*", "*shred *", "*> /dev/*"],
+      "action": "reject"
+    },
+
+    { "matches": ["*git push*--force*", "*git push*-f *"], "action": "reject" },
+    {
+      "matches": [
+        "*git reset --hard*",
+        "*git clean -fd*",
+        "*git clean -fx*",
+        "*git checkout -- .*"
+      ],
+      "action": "ask"
+    },
+    { "matches": "*git branch -D *", "action": "ask" },
+
+    {
+      "matches": [
+        "*cat*~/.ssh/*",
+        "*cat*~/.aws/*",
+        "*cat*~/.gnupg/*",
+        "*cat*~/.config/gh/*"
+      ],
+      "action": "ask"
+    },
+    {
+      "matches": [
+        "*cat*.env*",
+        "*cat*credentials*",
+        "*cat*secret*",
+        "*cat*token*",
+        "*cat*password*"
+      ],
+      "action": "ask"
+    },
+    { "matches": ["*cat*/etc/shadow*", "*cat*/etc/passwd*"], "action": "reject" },
+
+    { "matches": ["*npm install*", "*npm i *", "*npx *"], "action": "ask" },
+    {
+      "matches": [
+        "*yarn add*",
+        "*yarn global*",
+        "*pnpm add*",
+        "*pnpm install*",
+        "*pnpm i *",
+        "*pnpm dlx *",
+        "*pnx *"
+      ],
+      "action": "ask"
+    },
+    {
+      "matches": ["*pip install*", "*pip3 install*", "*pipx install*"],
+      "action": "ask"
+    },
+    {
+      "matches": [
+        "*brew install*",
+        "*brew cask*",
+        "*apt install*",
+        "*apt-get install*",
+        "*dnf install*",
+        "*pacman -S*"
+      ],
+      "action": "ask"
+    },
+    {
+      "matches": ["*cargo install*", "*go install*", "*gem install*"],
+      "action": "ask"
+    },
+
+    {
+      "matches": ["*curl *", "*wget *", "*nc *", "*ncat *", "*nmap *"],
+      "action": "ask"
+    },
+    {
+      "matches": ["*ssh *", "*scp *", "*rsync *", "*sftp *", "*ftp *"],
+      "action": "ask"
+    },
+
+    { "matches": ["*sudo *"], "action": "reject" },
+    { "matches": ["*sudo *", "*su *", "*doas *"], "action": "ask" },
+    { "matches": ["*chmod 777*", "*chmod -R 777*", "*chown *"], "action": "ask" },
+
+    {
+      "matches": ["*systemctl *", "*launchctl *", "*crontab *", "*service *"],
+      "action": "ask"
+    },
+    { "matches": ["*>/etc/*", "*>> /etc/*", "* tee /etc/*"], "action": "reject" },
+
+    {
+      "matches": ["*docker run*", "*docker exec*", "*docker compose up*"],
+      "action": "ask"
+    },
+    {
+      "matches": ["*kubectl apply*", "*kubectl delete*", "*kubectl exec*"],
+      "action": "ask"
+    },
+
+    {
+      "matches": ["*eval *", "*base64 -d*", "*bash -c*", "*sh -c*"],
+      "action": "ask"
+    },
+    { "matches": ["*| sh*", "*| bash*", "*> /dev/tcp/*"], "action": "ask" }
+  ]
+}
