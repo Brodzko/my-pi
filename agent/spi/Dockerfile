@@ -36,4 +36,7 @@ RUN ARCH="$(dpkg --print-architecture)" \
   && dpkg -i /tmp/glab.deb \
   && rm /tmp/glab.deb
 
+# pnpm (via corepack, shipped with Node)
+RUN corepack enable pnpm
+
 USER sandbox

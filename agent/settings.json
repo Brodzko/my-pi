@@ -10,5 +10,7 @@
     "google-gemini-cli/gemini-3-pro-preview"
   ],
   "hideThinkingBlock": true,
-  "defaultThinkingLevel": "medium"
+  "defaultThinkingLevel": "medium",
+  "extensions": ["~/rossum/coding-agents/pi/extensions"],
+  "skills": ["~/rossum/coding-agents/pi/skills"]
 }
