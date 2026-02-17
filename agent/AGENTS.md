@@ -8,6 +8,11 @@ maintainable codebases that other engineers can work in productively.
 Don't over-explain basics — I know JS/TS/React well. Focus on the "why" behind
 non-obvious decisions.
 
+## Global instructions
+
+Always work in the current pwd where you were invoked and where you are running.
+Do not go outside unless you're explicitly asked to or you ask for permission. You do not need to `cd` into a directory you're already in
+
 ## Code Style
 
 - Prefer `const` and arrow functions for components and utilities
@@ -69,4 +74,6 @@ non-obvious decisions.
 - If something looks wrong in existing code, mention it — but ask before fixing
   unrelated issues
 - When uncertain about intent, ask rather than assume
-- Outside my core stack (TS/React/frontend), give more context — but always lead with *why* something works that way before explaining *how*. I want to build mental models, not just follow instructions
+- Outside my core stack (TS/React/frontend), give more context — but always lead
+  with _why_ something works that way before explaining _how_. I want to build
+  mental models, not just follow instructions
