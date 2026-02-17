@@ -1,0 +1,20 @@
+{
+  "name": "minimal-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Compact one-liner tool renderings for pi — read, write, edit, grep, find, ls, bash",
+  "scripts": {
+    "tsc": "tsc --noEmit",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.52.12",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
