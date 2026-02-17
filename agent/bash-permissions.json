@@ -1,7 +1,10 @@
 {
   "sessionMemory": "command",
   "rules": [
-    { "matches": ["*rm -rf /*", "*rm -rf ~*", "*rm -rf .*"], "action": "reject" },
+    {
+      "matches": ["*rm -rf /*", "*rm -rf ~*", "*rm -rf .*"],
+      "action": "reject"
+    },
     {
       "matches": ["*mkfs*", "*dd if=*", "*shred *", "*> /dev/*"],
       "action": "reject"
@@ -38,7 +41,10 @@
       ],
       "action": "ask"
     },
-    { "matches": ["*cat*/etc/shadow*", "*cat*/etc/passwd*"], "action": "reject" },
+    {
+      "matches": ["*cat*/etc/shadow*", "*cat*/etc/passwd*"],
+      "action": "reject"
+    },
 
     { "matches": ["*npm install*", "*npm i *", "*npx *"], "action": "ask" },
     {
@@ -84,13 +90,19 @@
 
     { "matches": ["*sudo *"], "action": "reject" },
     { "matches": ["*sudo *", "*su *", "*doas *"], "action": "ask" },
-    { "matches": ["*chmod 777*", "*chmod -R 777*", "*chown *"], "action": "ask" },
+    {
+      "matches": ["*chmod 777*", "*chmod -R 777*", "*chown *"],
+      "action": "ask"
+    },
 
     {
       "matches": ["*systemctl *", "*launchctl *", "*crontab *", "*service *"],
       "action": "ask"
     },
-    { "matches": ["*>/etc/*", "*>> /etc/*", "* tee /etc/*"], "action": "reject" },
+    {
+      "matches": ["*>/etc/*", "*>> /etc/*", "* tee /etc/*"],
+      "action": "reject"
+    },
 
     {
       "matches": ["*docker run*", "*docker exec*", "*docker compose up*"],
