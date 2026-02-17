@@ -2,3 +2,5 @@ node_modules/
 sessions/
 auth.json
 *.log
+
+.vscode
