@@ -19,6 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV LANG=en_US.UTF-8
 
+# Prevent SIGUSR1 from starting the V8 inspector inside the sandbox.
+# Without this, an agent could `kill -USR1` its own node process, attach to
+# the debugger on 127.0.0.1:9229, and execute arbitrary JS in the pi process
+# — bypassing any tool-level guardrails.
+ENV NODE_OPTIONS=--disable-sigusr1
+
 RUN npm install -g @mariozechner/pi-coding-agent@${PI_VERSION} \
   && npm cache clean --force
 

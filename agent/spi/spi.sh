@@ -176,12 +176,12 @@ spi() {
   cwd="$(pwd)" || return
 
   # Clean stale stopped container
-  if docker ps -aq -f name="^${name}$" -f status=exited | grep -q .; then
+  if docker ps -aq -f name="${name}" -f status=exited | grep -q .; then
     docker rm "${name}" >/dev/null 2>&1
   fi
 
   # Start container if not running
-  if ! docker ps -q -f name="^${name}$" | grep -q .; then
+  if ! docker ps -q -f name="${name}" | grep -q .; then
     echo "Starting sandbox ${name}..."
 
     [[ ! -d "${HOME}/.pi/agent" ]] && mkdir -p "${HOME}/.pi/agent"
@@ -214,14 +214,15 @@ spi() {
 spi-clean() {
   if [[ "${1:-}" == "--all" ]]; then
     local ids
-    ids="$(docker ps -aq -f name="^${SPI_PREFIX}")"
+    ids="$(docker ps -aq -f name="${SPI_PREFIX}")"
     if [[ -z "${ids}" ]]; then
       echo "No sandbox containers found."
       return
     fi
-    # Intentional word-splitting: $ids contains space-separated container IDs.
-    # shellcheck disable=SC2086
-    docker rm -f ${ids}
+    # Remove each container individually so one failure doesn't block the rest.
+    while IFS= read -r id; do
+      docker rm -f "${id}" >/dev/null 2>&1 || docker stop "${id}" >/dev/null 2>&1 || true
+    done <<< "${ids}"
     echo "Removed all sandbox containers."
   else
     local hash name
