@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "amazon-bedrock": {
+      "baseUrl": "https://bedrock-runtime.eu-central-1.amazonaws.com",
+      "apiKey": "unused",
+      "api": "bedrock-converse-stream",
+      "models": [
+        {
+          "id": "eu.anthropic.claude-sonnet-4-6",
+          "name": "Claude Sonnet 4.6 (EU Bedrock)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 200000,
+          "maxTokens": 64000,
+          "cost": {
+            "input": 3,
+            "output": 15,
+            "cacheRead": 0.3,
+            "cacheWrite": 3.75
+          }
+        }
+      ]
+    }
+  }
+}

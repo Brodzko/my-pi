@@ -1,13 +1,14 @@
 {
   "lastChangelogVersion": "0.53.0",
   "defaultProvider": "amazon-bedrock",
-  "defaultModel": "eu.anthropic.claude-opus-4-6-v1",
+  "defaultModel": "eu.anthropic.claude-sonnet-4-6",
   "enabledModels": [
     "amazon-bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
     "amazon-bedrock/eu.anthropic.claude-opus-4-6-v1",
     "google-gemini-cli/gemini-2.5-flash",
     "amazon-bedrock/eu.anthropic.claude-sonnet-4-20250514-v1:0",
-    "google-gemini-cli/gemini-3-pro-preview"
+    "google-gemini-cli/gemini-3-pro-preview",
+    "amazon-bedrock/eu.anthropic.claude-sonnet-4-6"
   ],
   "hideThinkingBlock": true,
   "defaultThinkingLevel": "medium",
