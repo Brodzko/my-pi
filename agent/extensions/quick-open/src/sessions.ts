@@ -1,10 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
+import * as R from 'remeda';
 
 export type SessionEntry = {
   file: string;
   label: string;
   ago: string;
+  hasName: boolean;
 };
 
 type RichEntry = SessionEntry & { mtime: number };
@@ -12,12 +14,12 @@ type RichEntry = SessionEntry & { mtime: number };
 const formatAgo = (mtime: Date): string => {
   const diffMs = Date.now() - mtime.getTime();
   const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `${diffMin}m`;
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h ago`;
+  if (diffH < 24) return `${diffH}h`;
   const diffD = Math.floor(diffH / 24);
-  if (diffD < 7) return `${diffD}d ago`;
+  if (diffD < 30) return `${diffD}d`;
   return mtime.toLocaleDateString();
 };
 
@@ -25,7 +27,10 @@ const formatAgo = (mtime: Date): string => {
  * Extract a human-readable label from a session file's NDJSON content.
  * Priority: session_info.name > first user message text > filename stem.
  */
-const extractLabel = (content: string, fileStem: string): string => {
+const extractLabel = (
+  content: string,
+  fileStem: string
+): { label: string; hasName: boolean } => {
   let sessionName: string | undefined;
   let firstUserText: string | undefined;
 
@@ -69,7 +74,8 @@ const extractLabel = (content: string, fileStem: string): string => {
     if (sessionName && firstUserText) break;
   }
 
-  return sessionName ?? firstUserText ?? fileStem;
+  if (sessionName) return { label: sessionName, hasName: true };
+  return { label: firstUserText ?? fileStem, hasName: false };
 };
 
 /**
@@ -104,22 +110,25 @@ export const getSessions = async (
         if (!stat.isFile()) throw new Error('not a file');
 
         const stem = path.basename(f, path.extname(f));
-        const label = extractLabel(content, stem);
+        const { label, hasName } = extractLabel(content, stem);
 
         return {
           file: filePath,
           label,
           ago: formatAgo(stat.mtime),
+          hasName,
           mtime: stat.mtime.getTime(),
         };
       })
   );
 
-  return settled
-    .filter(
+  return R.pipe(
+    settled,
+    R.filter(
       (r): r is PromiseFulfilledResult<RichEntry> => r.status === 'fulfilled'
-    )
-    .map(r => r.value)
-    .sort((a, b) => b.mtime - a.mtime)
-    .map(({ file, label, ago }) => ({ file, label, ago }));
+    ),
+    R.map(r => r.value),
+    R.sortBy([(entry: RichEntry) => entry.mtime, 'desc']),
+    R.map(({ file, label, ago, hasName }) => ({ file, label, ago, hasName }))
+  );
 };

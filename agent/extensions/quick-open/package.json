@@ -10,7 +10,8 @@
   },
   "scripts": {
     "format": "prettier --write .",
-    "tsc": "tsc --noEmit"
+    "tsc": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "fuse.js": "^7.0.0",
@@ -20,6 +21,7 @@
     "@mariozechner/pi-coding-agent": "*",
     "@types/node": "^20.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "4.0.18"
   }
 }

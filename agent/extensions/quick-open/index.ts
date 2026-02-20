@@ -68,12 +68,10 @@ export default function (pi: ExtensionAPI) {
     if (source === 'at-sign') {
       const insertion =
         result.type === 'file' ? `@${result.path} ` : `@@${result.file} `;
-      const current = ctx.ui.getEditorText();
-      const separator = current && !current.endsWith(' ') ? ' ' : '';
-      // Defer by one tick so the TUI finishes tearing down the overlay and
-      // completes its first re-render before we update the editor text.
-      // Without this the text only appears after the next keypress.
+      // Defer by one tick so the TUI finishes tearing down the overlay first.
       setTimeout(() => {
+        const current = ctx.ui.getEditorText();
+        const separator = current && !current.endsWith(' ') ? ' ' : '';
         ctx.ui.setEditorText(current + separator + insertion);
       }, 0);
       return;

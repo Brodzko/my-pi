@@ -25,7 +25,8 @@ type FileCache = {
   durationMs: number;
 };
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 10_000;
+const BACKGROUND_REFRESH_INTERVAL_MS = 2_000;
 
 const IGNORED_DIRS = [
   '.git',
@@ -128,28 +129,59 @@ const fetchFiles = async (
   return { files: [], method: 'none', durationMs: elapsed() };
 };
 
-/** Fire-and-forget cache warm-up — call on session_start / session_switch. */
-export const prefetchFiles = (cwd: string, pi: ExtensionAPI): void => {
+const updateCache = (
+  cwd: string,
+  payload: FetchResult,
+  refreshing: boolean
+): void => {
+  cache = {
+    cwd,
+    files: payload.files,
+    fetchedAt: Date.now(),
+    refreshing,
+    method: payload.method,
+    durationMs: payload.durationMs,
+  };
+};
+
+const refreshCache = (cwd: string, pi: ExtensionAPI): Promise<void> =>
   fetchFiles(cwd, pi)
-    .then(({ files, method, durationMs }) => {
-      cache = {
-        cwd,
-        files,
-        fetchedAt: Date.now(),
-        refreshing: false,
-        method,
-        durationMs,
-      };
+    .then(payload => {
+      if (cache?.cwd !== cwd) return;
+      updateCache(cwd, payload, false);
     })
     .catch(() => {
+      if (cache?.cwd === cwd) cache.refreshing = false;
+    });
+
+/** Fire-and-forget cache warm-up — call on session_start / session_switch. */
+export const prefetchFiles = (cwd: string, pi: ExtensionAPI): void => {
+  if (cache?.cwd !== cwd) {
+    cache = {
+      cwd,
+      files: [],
+      fetchedAt: 0,
+      refreshing: true,
+      method: 'none',
+      durationMs: 0,
+    };
+  }
+
+  fetchFiles(cwd, pi)
+    .then(payload => {
+      if (cache?.cwd !== cwd) return;
+      updateCache(cwd, payload, false);
+    })
+    .catch(() => {
+      if (cache?.cwd === cwd) cache.refreshing = false;
       // Stale data is fine, we'll retry on the next dialog open.
     });
 };
 
 /**
  * Return files for `cwd`.
- * - Cache hit & fresh → return immediately (fromCache: true).
- * - Cache hit & stale → return stale + kick off background refresh.
+ * - Cache hit & fresh → return immediately (fromCache: true), with periodic background refresh.
+ * - Cache hit & stale → await a fresh fetch (fromCache: false).
  * - Cache miss → await a fresh fetch (fromCache: false).
  */
 export const getFiles = async (
@@ -159,23 +191,27 @@ export const getFiles = async (
   const now = Date.now();
 
   if (cache?.cwd === cwd) {
-    const stale = now - cache.fetchedAt > CACHE_TTL_MS;
+    const ageMs = now - cache.fetchedAt;
+    const stale = ageMs > CACHE_TTL_MS;
+
     if (stale && !cache.refreshing) {
       cache.refreshing = true;
-      fetchFiles(cwd, pi)
-        .then(({ files, method, durationMs }) => {
-          if (cache) {
-            cache.files = files;
-            cache.method = method;
-            cache.durationMs = durationMs;
-            cache.fetchedAt = Date.now();
-            cache.refreshing = false;
-          }
-        })
-        .catch(() => {
-          if (cache) cache.refreshing = false;
-        });
+      const fresh = await fetchFiles(cwd, pi).catch(() => undefined);
+      if (fresh) {
+        updateCache(cwd, fresh, false);
+        return {
+          files: fresh.files,
+          method: fresh.method,
+          durationMs: fresh.durationMs,
+          fromCache: false,
+        };
+      }
+      if (cache?.cwd === cwd) cache.refreshing = false;
+    } else if (ageMs > BACKGROUND_REFRESH_INTERVAL_MS && !cache.refreshing) {
+      cache.refreshing = true;
+      void refreshCache(cwd, pi);
     }
+
     return {
       files: cache.files,
       method: cache.method,
@@ -184,7 +220,12 @@ export const getFiles = async (
     };
   }
 
-  const { files, method, durationMs } = await fetchFiles(cwd, pi);
-  cache = { cwd, files, fetchedAt: now, refreshing: false, method, durationMs };
-  return { files, method, durationMs, fromCache: false };
+  const fresh = await fetchFiles(cwd, pi);
+  updateCache(cwd, fresh, false);
+  return {
+    files: fresh.files,
+    method: fresh.method,
+    durationMs: fresh.durationMs,
+    fromCache: false,
+  };
 };
