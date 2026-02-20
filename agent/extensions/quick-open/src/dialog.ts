@@ -5,7 +5,7 @@ import {
   matchesKey,
   visibleWidth,
 } from '@mariozechner/pi-tui';
-import { pipe, reduce, times } from 'remeda';
+import * as R from 'remeda';
 import { fuzzySearch, type FuzzyResult, type HighlightRange } from './fuzzy';
 import type { SessionEntry } from './sessions';
 
@@ -17,7 +17,7 @@ export type QuickOpenResult =
   | null;
 
 const MAX_VISIBLE = 8;
-const DIALOG_WIDTH = 72;
+const DIALOG_WIDTH = 96;
 
 // ─── module-level pure helpers ────────────────────────────────────────────────
 
@@ -63,18 +63,19 @@ const truncateResult = (
 const buildHighlighted = (
   result: FuzzyResult,
   isSelected: boolean,
-  theme: Theme
+  theme: Theme,
+  useAccentText = false
 ): string => {
   const { item, highlights } = result;
   const plain = (s: string) =>
-    isSelected ? theme.fg('accent', s) : theme.fg('text', s);
+    isSelected || useAccentText ? theme.fg('accent', s) : theme.fg('text', s);
   const match = (s: string) => theme.fg('accent', s);
 
   if (highlights.length === 0) return plain(item);
 
-  return pipe(
+  return R.pipe(
     highlights,
-    reduce(
+    R.reduce(
       ({ out, pos }, [start, end]) => ({
         out:
           out +
@@ -291,22 +292,42 @@ class QuickOpenDialog implements Focusable {
     if (this.results.length === 0) {
       return [
         row('  ' + th.fg('dim', 'no matches')),
-        ...times(MAX_VISIBLE - 1, () => row('')),
+        ...R.times(MAX_VISIBLE - 1, () => row('')),
       ];
     }
 
     const hasMore = this.results.length > this.scrollOffset + MAX_VISIBLE;
     const itemSlots = hasMore ? MAX_VISIBLE - 1 : MAX_VISIBLE;
-    const maxItemVis = innerW - 3; // " ▶ " prefix is 3 visible chars
+    const maxContentVis = innerW - 3; // " ▶ " prefix is 3 visible chars
 
     const itemRows = this.results
       .slice(this.scrollOffset, this.scrollOffset + itemSlots)
       .map((result, i) => {
         const isSelected = this.scrollOffset + i === this.selectedIdx;
         const prefix = isSelected ? th.fg('accent', ' ▶ ') : '   ';
+
+        if (this.mode === 'sessions') {
+          const session = this.sessions[result.refIndex];
+          const ageTag = `[${session?.ago ?? '?'}] `;
+          const agePart = th.fg('dim', ageTag);
+          const maxLabelVis = Math.max(1, maxContentVis - visibleWidth(ageTag));
+          const labelResult = truncateResult(result, maxLabelVis);
+          const labelPart = buildHighlighted(
+            labelResult,
+            isSelected,
+            th,
+            Boolean(session?.hasName)
+          );
+          return row(prefix + agePart + labelPart);
+        }
+
         return row(
           prefix +
-            buildHighlighted(truncateResult(result, maxItemVis), isSelected, th)
+            buildHighlighted(
+              truncateResult(result, maxContentVis),
+              isSelected,
+              th
+            )
         );
       });
 
@@ -325,7 +346,7 @@ class QuickOpenDialog implements Focusable {
     return [
       ...itemRows,
       ...moreRow,
-      ...times(MAX_VISIBLE - itemRows.length - moreRow.length, () => row('')),
+      ...R.times(MAX_VISIBLE - itemRows.length - moreRow.length, () => row('')),
     ];
   }
 
