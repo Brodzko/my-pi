@@ -1,0 +1,7 @@
+{
+  "commandName": "index-session",
+  "statusKey": "index-session",
+  "minNewUserMessages": 5,
+  "notificationAutoClearMs": 2000,
+  "modelKeys": ["openai-codex/gpt-5.1-codex-mini", "openai-codex/gpt-5.1"]
+}

@@ -1,5 +1,6 @@
 node_modules/
 sessions/
+sessions-meta/
 auth.json
 *.log
 
