@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "statusKey": "query-session",
+  "notificationAutoClearMs": 3000,
+  "modelKeys": ["openai-codex/gpt-5.1-codex-mini", "openai-codex/gpt-5.1"],
+  "maxBytes": 160000,
+  "maxCallsPerTurn": 1,
+  "timeoutMs": 30000,
+  "useSessionsMeta": true
+}
