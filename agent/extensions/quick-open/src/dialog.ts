@@ -13,7 +13,7 @@ export type QuickOpenMode = 'files' | 'sessions';
 
 export type QuickOpenResult =
   | { type: 'file'; path: string }
-  | { type: 'session'; label: string; file: string }
+  | { type: 'session'; id: string; label: string; file: string }
   | null;
 
 const MAX_VISIBLE = 8;
@@ -134,11 +134,21 @@ class QuickOpenDialog implements Focusable {
     this.scrollOffset = 0;
   }
 
+  private getVisibleItemSlots(scrollOffset: number): number {
+    const hasMore = this.results.length > scrollOffset + MAX_VISIBLE;
+    return hasMore ? MAX_VISIBLE - 1 : MAX_VISIBLE;
+  }
+
   private clampScroll(): void {
-    if (this.selectedIdx < this.scrollOffset) {
-      this.scrollOffset = this.selectedIdx;
-    } else if (this.selectedIdx >= this.scrollOffset + MAX_VISIBLE) {
-      this.scrollOffset = this.selectedIdx - MAX_VISIBLE + 1;
+    while (this.selectedIdx < this.scrollOffset) {
+      this.scrollOffset--;
+    }
+
+    while (
+      this.selectedIdx >=
+      this.scrollOffset + this.getVisibleItemSlots(this.scrollOffset)
+    ) {
+      this.scrollOffset++;
     }
   }
 
@@ -177,7 +187,12 @@ class QuickOpenDialog implements Focusable {
     const session = this.sessions[result.refIndex];
     this.done(
       session
-        ? { type: 'session', label: session.label, file: session.file }
+        ? {
+            type: 'session',
+            id: session.id,
+            label: session.label,
+            file: session.file,
+          }
         : null
     );
   }

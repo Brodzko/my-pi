@@ -3,6 +3,7 @@ import path from 'path';
 import * as R from 'remeda';
 
 export type SessionEntry = {
+  id: string;
   file: string;
   label: string;
   ago: string;
@@ -10,6 +11,12 @@ export type SessionEntry = {
 };
 
 type RichEntry = SessionEntry & { mtime: number };
+
+const SESSION_ID_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+const extractSessionIdFromStem = (fileStem: string): string =>
+  fileStem.match(SESSION_ID_PATTERN)?.[0] ?? fileStem;
 
 const formatAgo = (mtime: Date): string => {
   const diffMs = Date.now() - mtime.getTime();
@@ -24,13 +31,15 @@ const formatAgo = (mtime: Date): string => {
 };
 
 /**
- * Extract a human-readable label from a session file's NDJSON content.
- * Priority: session_info.name > first user message text > filename stem.
+ * Extract session metadata from NDJSON content.
+ * Session id priority: explicit session.id > UUID-like part of filename stem > full stem.
+ * Label priority: session_info.name > first user message text > filename stem.
  */
-const extractLabel = (
+const extractSessionData = (
   content: string,
   fileStem: string
-): { label: string; hasName: boolean } => {
+): { id: string; label: string; hasName: boolean } => {
+  let sessionId: string | undefined;
   let sessionName: string | undefined;
   let firstUserText: string | undefined;
 
@@ -43,6 +52,15 @@ const extractLabel = (
       entry = JSON.parse(trimmed) as Record<string, unknown>;
     } catch {
       continue;
+    }
+
+    if (
+      !sessionId &&
+      entry.type === 'session' &&
+      typeof entry.id === 'string' &&
+      entry.id
+    ) {
+      sessionId = entry.id;
     }
 
     if (
@@ -70,12 +88,15 @@ const extractLabel = (
       }
     }
 
-    // Short-circuit once we have both pieces.
-    if (sessionName && firstUserText) break;
+    // Short-circuit once we have everything we care about.
+    if (sessionId && sessionName && firstUserText) break;
   }
 
-  if (sessionName) return { label: sessionName, hasName: true };
-  return { label: firstUserText ?? fileStem, hasName: false };
+  return {
+    id: sessionId ?? extractSessionIdFromStem(fileStem),
+    label: sessionName ?? firstUserText ?? fileStem,
+    hasName: Boolean(sessionName),
+  };
 };
 
 /**
@@ -110,9 +131,10 @@ export const getSessions = async (
         if (!stat.isFile()) throw new Error('not a file');
 
         const stem = path.basename(f, path.extname(f));
-        const { label, hasName } = extractLabel(content, stem);
+        const { id, label, hasName } = extractSessionData(content, stem);
 
         return {
+          id,
           file: filePath,
           label,
           ago: formatAgo(stat.mtime),
@@ -129,6 +151,12 @@ export const getSessions = async (
     ),
     R.map(r => r.value),
     R.sortBy([(entry: RichEntry) => entry.mtime, 'desc']),
-    R.map(({ file, label, ago, hasName }) => ({ file, label, ago, hasName }))
+    R.map(({ id, file, label, ago, hasName }) => ({
+      id,
+      file,
+      label,
+      ago,
+      hasName,
+    }))
   );
 };

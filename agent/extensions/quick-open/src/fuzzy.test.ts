@@ -31,4 +31,46 @@ describe('fuzzySearch', () => {
       'src/session.ts'
     );
   });
+
+  it('treats separators in query as mostly irrelevant', () => {
+    const items = [
+      'src/session-query.ts',
+      'src/sessionquery.ts',
+      'docs/some-other-file.md',
+    ];
+
+    const compact = fuzzySearch('sessionquery', items).map(
+      result => result.item
+    );
+    const separated = fuzzySearch('session-query', items).map(
+      result => result.item
+    );
+
+    expect(separated.slice(0, 2)).toEqual(compact.slice(0, 2));
+  });
+
+  it('prioritizes entries that match all query terms', () => {
+    const items = [
+      'agent/extensions/quick-open/src/fuzzy.ts',
+      'agent/extensions/quick-open/src/dialog.ts',
+      'agent/extensions/other/src/fuzzy.ts',
+    ];
+
+    const results = fuzzySearch('quickopen fuzzy', items);
+
+    expect(results[0]?.item).toBe('agent/extensions/quick-open/src/fuzzy.ts');
+  });
+
+  it('does not treat weak fuzzy hits as full token coverage', () => {
+    const items = [
+      'agent/extensions/session-index/src',
+      'agent/extensions/session-index/src/config.ts',
+    ];
+
+    const results = fuzzySearch('session src conf', items);
+
+    expect(results[0]?.item).toBe(
+      'agent/extensions/session-index/src/config.ts'
+    );
+  });
 });

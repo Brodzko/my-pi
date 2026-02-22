@@ -45,17 +45,19 @@ describe('getSessions', () => {
       now
     );
 
+    const namedSessionId = '11111111-1111-4111-8111-111111111111';
     await writeSessionFile(
       sessionDir,
-      'named.ndjson',
+      `2026-02-20_demo_${namedSessionId}.ndjson`,
       '{"type":"session_info","name":"Planning"}\n{"type":"message","message":{"role":"user","content":"fallback text"}}\n',
       oneHourAgo
     );
 
+    const messageSessionId = '33333333-3333-4333-8333-333333333333';
     await writeSessionFile(
       sessionDir,
       'message.ndjson',
-      '{"type":"message","message":{"role":"user","content":"first user prompt"}}\n',
+      `{"type":"session","id":"${messageSessionId}"}\n{"type":"message","message":{"role":"user","content":"first user prompt"}}\n`,
       twoHoursAgo
     );
 
@@ -69,24 +71,27 @@ describe('getSessions', () => {
     const sessions = await getSessions(sessionDir, currentSessionPath);
 
     expect(sessions.map(session => path.basename(session.file))).toEqual([
-      'named.ndjson',
+      `2026-02-20_demo_${namedSessionId}.ndjson`,
       'message.ndjson',
       'fallback.ndjson',
     ]);
 
     expect(sessions[0]).toMatchObject({
+      id: namedSessionId,
       label: 'Planning',
       hasName: true,
       ago: '1h',
     });
 
     expect(sessions[1]).toMatchObject({
+      id: messageSessionId,
       label: 'first user prompt',
       hasName: false,
       ago: '2h',
     });
 
     expect(sessions[2]).toMatchObject({
+      id: 'fallback',
       label: 'fallback',
       hasName: false,
       ago: '1d',

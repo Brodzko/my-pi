@@ -67,13 +67,10 @@ export default function (pi: ExtensionAPI) {
 
     if (source === 'at-sign') {
       const insertion =
-        result.type === 'file' ? `@${result.path} ` : `@@${result.file} `;
-      // Defer by one tick so the TUI finishes tearing down the overlay first.
-      setTimeout(() => {
-        const current = ctx.ui.getEditorText();
-        const separator = current && !current.endsWith(' ') ? ' ' : '';
-        ctx.ui.setEditorText(current + separator + insertion);
-      }, 0);
+        result.type === 'file' ? `@${result.path} ` : `@@${result.id} `;
+      const current = ctx.ui.getEditorText();
+      const separator = current && !current.endsWith(' ') ? ' ' : '';
+      ctx.ui.setEditorText(current + separator + insertion);
       return;
     }
 
