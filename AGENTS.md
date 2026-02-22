@@ -1,6 +1,8 @@
 # .pi Repo Instructions
 
-Before considering any code task done, run `npm run format` and `npm run tsc` in the relevant package if it is an npm package, and fix all errors. Every extension/skill that includes code should have these scripts.
+Before considering any code task done, run `npm run format`, `npm run lint`, `npm run tsc`, and `npm run test` only for relevant `pi` extension/skill packages that contain a `package.json` and code affected by the task. Fix all errors in the checks you run.
+
+If a relevant extension/skill package has code but is missing any of these scripts, add the missing scripts first, then run them. If there is no `package.json`, or the target is not an extension/skill, or there is no code to validate/test, skip these checks.
 
 When installing `npm` packages, always pin at exact version (no `^` or `~`), prefer latest at the point of installation.
 
