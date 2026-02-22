@@ -191,7 +191,6 @@ spi() {
       --cap-drop ALL
       --security-opt no-new-privileges
       --pids-limit 512
-      --memory 4g
       -e HOME=/home/sandbox
       -v "${cwd}:${cwd}"
       -v "${HOME}/.pi/agent:/home/sandbox/.pi/agent"
