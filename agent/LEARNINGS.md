@@ -56,3 +56,23 @@ Prefer concise entries with explicit triggers.
 - Rule (future behavior change): For multi-term query aggregation, only count token coverage on strong hits (normalized substring or very strong fuzzy score) before applying all-terms prioritization.
 - Trigger (when this applies): Tokenized fuzzy search where all-token matches are preferred over partial matches.
 - Example file/commit: agent/extensions/quick-open/src/fuzzy.ts
+
+- ID: LRN-20260222-05
+- Level: L1 (policy)
+- Tags: [refactor, shared-modules, extension-maintainability]
+- Date: 2026-02-22
+- Context: Cross-extension consolidation in `agent/extensions/sessions` needed a second pass after review feedback.
+- Signal (what failed or what worked): One-by-one local cleanup left duplicated runtime helpers (status handling, model availability, config/model notifications) in extension entrypoints.
+- Rule (future behavior change): For sibling-extension refactors, always run a dedicated duplication sweep before finishing (status flows, model selection, config warning formatting, error-message normalization) and move reusable pieces into shared modules in the same pass.
+- Trigger (when this applies): Any refactor touching multiple extensions/packages with similar lifecycle logic.
+- Example file/commit: agent/extensions/sessions/shared/{status.ts,model-availability.ts,feedback.ts}
+
+- ID: LRN-20260222-06
+- Level: L2 (tactic)
+- Tags: [quick-open, sessions, parsing, deduplication]
+- Date: 2026-02-22
+- Context: Session metadata parsing drifted between `quick-open` session listing and `session-query` discovery.
+- Signal (what failed or what worked): Independent parsers diverged (trimming/content handling) and duplicated fragile JSONL line walking.
+- Rule (future behavior change): When two features parse the same session file contract, centralize extraction into one parser with option flags (e.g. text length limits) and reuse it from both callsites.
+- Trigger (when this applies): Any new consumer of session JSONL/NDJSON metadata (id/name/first-user-text).
+- Example file/commit: agent/extensions/sessions/shared/session-file-label.ts

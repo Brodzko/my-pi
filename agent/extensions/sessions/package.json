@@ -1,0 +1,32 @@
+{
+  "name": "sessions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "prettier --check .",
+    "test": "vitest run",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "0.54.0",
+    "@mariozechner/pi-tui": "0.54.1",
+    "zod": "4.1.11"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "0.54.0",
+    "@types/node": "25.3.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "pi": {
+    "extensions": [
+      "./session-index/src/index.ts",
+      "./session-query/src/index.ts",
+      "./session-reference/src/index.ts",
+      "./session-name-widget/src/index.ts"
+    ]
+  }
+}

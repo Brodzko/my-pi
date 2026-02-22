@@ -46,3 +46,33 @@ Avoid logging temporary implementation details.
   - Some cross-file type imports remain, requiring discipline to avoid accidental cycles.
 - Trigger (when to revisit): If type duplication or import complexity materially increases in a package.
 - Follow-up: During review, prefer moving types to the closest module when touching related code.
+
+- ID: DEC-20260222-03
+- Scope: repo
+- Tags: [refactor, imports, code-organization]
+- Date: 2026-02-22
+- Decision: Do not keep re-export-only files just to preserve old import paths during refactors; delete the wrappers and update all imports to the real module locations.
+- Context: Thin compatibility wrapper files (only re-exports) add indirection and hide the actual ownership/location of code.
+- Alternatives considered:
+  - Keep wrapper files to minimize immediate import churn.
+  - Use barrel-style compatibility modules temporarily.
+- Tradeoffs:
+  - Clearer module boundaries and easier navigation.
+  - Refactors require broader import updates in the same change.
+- Trigger (when to revisit): If migration constraints require temporary compatibility layers across independent packages.
+- Follow-up: When refactoring, run `tsc` to surface stale imports and update them in the same pass.
+
+- ID: DEC-20260222-04
+- Scope: repo
+- Tags: [architecture, extensions, dependencies]
+- Date: 2026-02-22
+- Decision: Avoid direct dependencies from one feature extension group to another (e.g., `quick-open` -> `sessions`); if logic is shared across groups, place it in a neutral shared location under `agent/extensions/shared`.
+- Context: Group-local shared folders are appropriate for intra-group reuse, but importing them from outside the group creates unintended architectural coupling.
+- Alternatives considered:
+  - Keep direct cross-group imports to maximize short-term reuse speed.
+  - Duplicate parsing logic in each extension group.
+- Tradeoffs:
+  - Cleaner dependency graph and clearer ownership boundaries.
+  - Slightly more coordination for neutral shared modules and import path updates.
+- Trigger (when to revisit): If extension packaging/deployment model changes to a monolith where group boundaries no longer matter.
+- Follow-up: During dedup refactors, check import directions and relocate shared code before finalizing.

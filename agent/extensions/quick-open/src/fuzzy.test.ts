@@ -63,14 +63,14 @@ describe('fuzzySearch', () => {
 
   it('does not treat weak fuzzy hits as full token coverage', () => {
     const items = [
-      'agent/extensions/session-index/src',
-      'agent/extensions/session-index/src/config.ts',
+      'agent/extensions/sessions/session-index/src',
+      'agent/extensions/sessions/session-index/src/config.ts',
     ];
 
     const results = fuzzySearch('session src conf', items);
 
     expect(results[0]?.item).toBe(
-      'agent/extensions/session-index/src/config.ts'
+      'agent/extensions/sessions/session-index/src/config.ts'
     );
   });
 });

@@ -1,5 +1,9 @@
 node_modules/
 sessions/
+!agent/extensions/sessions/
+!agent/extensions/sessions/**
+agent/extensions/sessions/node_modules/
+agent/extensions/sessions/**/node_modules/
 sessions-meta/
 auth.json
 *.log
