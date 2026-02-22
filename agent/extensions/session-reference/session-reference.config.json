@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "statusKey": "session-reference",
+  "notificationAutoClearMs": 3000,
+  "maxRefsPerPrompt": 3,
+  "maxInjectedBytes": 12000,
+  "debugDisplayInjectedMessage": false
+}
