@@ -36,7 +36,9 @@ RUN ARCH="$(dpkg --print-architecture)" \
   && dpkg -i /tmp/glab.deb \
   && rm /tmp/glab.deb
 
-# pnpm (via corepack, shipped with Node)
-RUN corepack enable pnpm
+ARG PNPM_VERSION=9.15.4
+RUN npm i -g pnpm@${PNPM_VERSION}
+
+ENV NODE_OPTIONS="--disable-sigusr1 --max-old-space-size=8096"
 
 USER sandbox
