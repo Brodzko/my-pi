@@ -57,6 +57,38 @@ When importing anything from `remeda`, use `import * as R from 'remeda'` to name
   - when disabled, do not expose the tool and do not install extra dependencies
 - If installation is needed, prefer explicit local setup paths; avoid side effects when feature is disabled.
 
+### CLI and contract standards for portable cores
+
+- Standardize on a **CLI contract**, not a specific framework.
+- For TypeScript/Node cores, prefer `citty` by default for consistent command/help UX.
+- Non-Node cores may use equivalent tooling if they provide the same guarantees.
+
+#### Required discoverability
+
+- Root `--help` and subcommand-level `--help` must be implemented.
+- `--version` must be implemented.
+- Help output must include concrete usage examples.
+
+#### Required machine interface
+
+- Core must support deterministic machine-readable I/O (JSON stdin/stdout contract and/or `--json` mode).
+- Success responses must use a stable envelope: `{ ok: true, data, meta? }`.
+- Error responses must use a stable envelope: `{ ok: false, error: { code, message, details? } }`.
+- Human-readable logs/debug output go to stderr; stdout remains parseable for wrappers.
+
+#### Required operational safety
+
+- Define/document exit codes and error codes.
+- Support explicit input/output sources (no hidden globals required for basic execution).
+- Add `--dry-run` for side-effectful commands where feasible.
+- Support timeout/cancellation handling where feasible.
+
+#### Skill-facing documentation
+
+- Each extension must ship a small, predictable usage artifact for skills:
+  - `docs/cli-usage.md` (human quickstart)
+  - `docs/cli-contract.json` (machine-readable commands/flags/examples)
+
 ### Definition of done for new `pi` extensions/skills
 
 - Portable core executable exists (or a clear justification why not).
@@ -65,3 +97,4 @@ When importing anything from `remeda`, use `import * as R from 'remeda'` to name
 - Tool exposure is gated by skill enablement.
 - Local-only installation/execution path is documented.
 - Migration path to at least one non-`pi` agent (e.g. Claude Code) is documented before work is considered complete.
+- CLI discoverability and machine contract requirements above are satisfied.
