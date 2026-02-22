@@ -15,28 +15,52 @@ Do not go outside unless you're explicitly asked to or you ask for permission. Y
 
 ## Execution Loop (mandatory)
 
-For every non-trivial task:
+For major or high-risk tasks (or when review/approval is needed before implementation):
 1. Restate the goal and constraints in 1-3 bullets.
 2. Propose a short plan (2-5 steps) before making edits.
-3. Execute incrementally in small, reviewable changes.
-4. Verify with relevant checks.
-5. Reflect briefly on uncertainty, failed attempts, and what should be reused.
+3. Ask for review/approval if requested or implied by the task.
+4. Execute incrementally in small, reviewable changes.
+5. Verify with relevant checks.
+6. Reflect briefly on uncertainty, failed attempts, and what should be reused.
+
+For minor, low-risk tasks, proceed directly without mandatory upfront plan approval.
 
 ## Continuous Learning
 
-At the start of each task, read these files if they exist and apply relevant rules:
+At the start of each task, use targeted retrieval from memory files if they exist:
 - `agent/LEARNINGS.md`
 - `agent/ANTI_PATTERNS.md`
 - `agent/DECISIONS.md`
 
-When a task reveals a reusable lesson, append it to `agent/LEARNINGS.md` using:
+Do not read these files end-to-end by default.
+Use `grep` with a query set of 3-5 semantically related keywords (mix broader intent words + specific tokens like feature name, error text, package, API), then read only matching sections.
+Prefer iterative retrieval: start broad, refine with adjacent terms from matches, stop when evidence is sufficient.
+Only read full files when explicitly requested or during periodic memory cleanup.
+
+### Memory Curation Rules
+
+Capture only high-signal, reusable lessons.
+Do not store one-off trivia, obvious basics, or transient noise.
+
+Record a new entry only when at least one is true:
+- The issue recurred or is likely to recur.
+- The fix required non-obvious reasoning.
+- The decision affects architecture, contracts, or team conventions.
+- The failure mode is expensive if repeated.
+
+Prefer two granularity levels:
+- **L1 (policy-level):** durable rules and decision heuristics.
+- **L2 (tactic-level):** concrete low-level fixes with precise triggers and constraints.
+
+If an entry already exists, update/merge it instead of appending duplicates.
+Keep entries concise, specific, and searchable.
+
+When adding to `agent/LEARNINGS.md`, include:
 - Context
 - Signal (what failed or what worked)
 - Rule (future behavior change)
 - Trigger (when to apply)
 - Example file/commit
-
-Keep lessons short and specific. Prefer one durable lesson over many vague notes.
 
 ## Failure Recovery Protocol
 
