@@ -27,40 +27,82 @@ For minor, low-risk tasks, proceed directly without mandatory upfront plan appro
 
 ## Continuous Learning
 
-At the start of each task, use targeted retrieval from memory files if they exist:
-- `agent/LEARNINGS.md`
-- `agent/ANTI_PATTERNS.md`
-- `agent/DECISIONS.md`
+Primary memory is **per-project** and must be proactively maintained in the current cwd:
+- Directory: `.brodzko/memory/`
+- One memory per file (no giant append-only file)
+- File names must be descriptive and grep-friendly, e.g. `vite-ts-path-alias-resolution.md`
 
-Do not read these files end-to-end by default.
-Use `grep` with a query set of 3-5 semantically related keywords (mix broader intent words + specific tokens like feature name, error text, package, API), then read only matching sections.
+At the start of each task, do targeted retrieval from:
+1. Project memory: `.brodzko/memory/**/*.md` (primary)
+2. Global memory (fallback):
+   - `~/.pi/agent/LEARNINGS.md`
+   - `~/.pi/agent/ANTI_PATTERNS.md`
+   - `~/.pi/agent/DECISIONS.md`
+
+Do not read memory end-to-end by default.
+Use `grep` with 3-5 semantically related keywords (mix intent words + concrete tokens like feature name, error text, package, API), then read only matching files/sections.
 Prefer iterative retrieval: start broad, refine with adjacent terms from matches, stop when evidence is sufficient.
-Only read full files when explicitly requested or during periodic memory cleanup.
+
+When project memory is missing, initialize it:
+- Create `.brodzko/memory/`
+- Ensure `.brodzko/` is gitignored (prefer `.git/info/exclude` for local-only ignore; use `.gitignore` only if requested)
+- Create `.brodzko/memory/_template.md` if missing, using the required format below
+
+### Project Memory File Format (required)
+
+Each `.brodzko/memory/*.md` file must start with YAML frontmatter:
+
+```md
+---
+keywords: ["vite", "tsconfig", "path-alias"]
+summary: "Fix TS path aliases by aligning tsconfig paths and bundler resolver."
+tags: ["tooling", "typescript", "build"]
+related: ["tsconfig-paths", "vite.config.ts"]
+---
+
+## Trigger
+- When imports resolve in editor but fail at runtime/build.
+
+## Learning
+- Keep alias source-of-truth in one place and derive secondary config.
+
+## References
+- apps/web/vite.config.ts
+- tsconfig.base.json
+```
 
 ### Memory Curation Rules
 
 Capture only high-signal, reusable lessons.
 Do not store one-off trivia, obvious basics, or transient noise.
 
-Record a new entry only when at least one is true:
+Record or update a project memory when at least one is true:
 - The issue recurred or is likely to recur.
 - The fix required non-obvious reasoning.
 - The decision affects architecture, contracts, or team conventions.
 - The failure mode is expensive if repeated.
 
-Prefer two granularity levels:
-- **L1 (policy-level):** durable rules and decision heuristics.
-- **L2 (tactic-level):** concrete low-level fixes with precise triggers and constraints.
+Before creating a new memory file, run a duplicate check:
+- Grep `.brodzko/memory/` using candidate keywords/tags/error tokens.
+- If overlap exists, update the existing file instead of creating a near-duplicate.
 
-If an entry already exists, update/merge it instead of appending duplicates.
+If an entry already exists, update/merge it instead of duplicating.
 Keep entries concise, specific, and searchable.
 
-When adding to `agent/LEARNINGS.md`, include:
-- Context
-- Signal (what failed or what worked)
-- Rule (future behavior change)
-- Trigger (when to apply)
-- Example file/commit
+### Session Reflection & Procedural Memory (required)
+
+At the end of every meaningful task/session, run a short reflective pass and update project memory proactively (without waiting for explicit user request):
+1. What triggered the work? (bug, request, failure mode, decision point)
+2. What changed in behavior/process/tooling that should be repeated?
+3. Is this a new memory or an update to an existing one?
+4. Which references make the memory verifiable (file paths, commands, PR/commit)?
+
+Store this as either:
+- **Reflective memory**: decision heuristics, tradeoff rationale, process lessons.
+- **Procedural memory**: step-by-step repeatable workflow/checklist for future tasks.
+
+Use the same required frontmatter and `Trigger/Learning/References` structure.
+When procedural, encode the learning as concise ordered steps in `Learning`.
 
 ## Failure Recovery Protocol
 
@@ -69,7 +111,7 @@ If verification fails:
 2. State the likely root cause in one sentence.
 3. Apply the smallest fix first.
 4. Re-run impacted checks, then run the required full checks.
-5. Capture a reusable non-obvious fix in `agent/LEARNINGS.md`.
+5. Capture a reusable non-obvious fix in project memory (`.brodzko/memory/`) and optionally mirror a distilled policy to `~/.pi/agent/LEARNINGS.md` if broadly reusable.
 
 ## Code Style
 
@@ -131,7 +173,7 @@ If verification fails:
 - [ ] `npm run format` and `npm run tsc` run in relevant package(s)
 - [ ] Relevant tests run, or explicitly called out as not run
 - [ ] Risks, assumptions, and follow-ups stated clearly
-- [ ] Reusable lesson captured in `agent/LEARNINGS.md` when applicable
+- [ ] Reusable lesson captured in `.brodzko/memory/` (project) when applicable; promote to `~/.pi/agent/LEARNINGS.md` only if cross-project
 
 ## Communication
 
