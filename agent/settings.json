@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.54.0",
+  "lastChangelogVersion": "0.54.2",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "enabledModels": [
@@ -9,7 +9,7 @@
     "openai-codex/gpt-5.2-codex"
   ],
   "hideThinkingBlock": true,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "extensions": [
     "~/rossum/coding-agents/pi/extensions",
     "./extensions/sessions"
