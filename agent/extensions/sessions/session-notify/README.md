@@ -20,7 +20,7 @@ File: `session-notify.config.json`
   "enabled": true,
   "statusKey": "session-notify",
   "notificationAutoClearMs": 4000,
-  "soundMode": "terminal-bell",
+  "soundMode": "auto",
   "bellCount": 1
 }
 ```
@@ -28,5 +28,5 @@ File: `session-notify.config.json`
 - `enabled`: enables/disables the extension.
 - `statusKey`: footer status slot key.
 - `notificationAutoClearMs`: footer status auto-clear delay.
-- `soundMode`: currently supports `"terminal-bell"`.
+- `soundMode`: `"auto"` (OSC notification + bell fallback), `"terminal-osc"`, or `"terminal-bell"`.
 - `bellCount`: number of bell characters emitted per completion.
