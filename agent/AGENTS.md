@@ -50,7 +50,8 @@ When project memory is missing, initialize it:
 
 ### Project Memory File Format (required)
 
-Each `.brodzko/memory/*.md` file must start with YAML frontmatter:
+Each `.brodzko/memory/*.md` file must start with YAML frontmatter.
+Each memory must include `## Trigger`, `## Learning`, `## Reflection`, and `## References` sections.
 
 ```md
 ---
@@ -65,6 +66,12 @@ related: ["tsconfig-paths", "vite.config.ts"]
 
 ## Learning
 - Keep alias source-of-truth in one place and derive secondary config.
+
+## Reflection
+- What we did: Aligned alias config between TypeScript and bundler.
+- Why we did it: Runtime/build resolution diverged from editor behavior.
+- Where we failed/succeeded: Failed with split sources of truth; succeeded after consolidating alias ownership.
+- How we arrived here: Reproduced failure, compared resolver configs, then validated with build/typecheck.
 
 ## References
 - apps/web/vite.config.ts
@@ -101,7 +108,8 @@ Store this as either:
 - **Reflective memory**: decision heuristics, tradeoff rationale, process lessons.
 - **Procedural memory**: step-by-step repeatable workflow/checklist for future tasks.
 
-Use the same required frontmatter and `Trigger/Learning/References` structure.
+Use the same required frontmatter and `Trigger/Learning/Reflection/References` structure.
+`Reflection` is mandatory and should capture: what we did, why we did it, where we failed/succeeded, and how we arrived at the result.
 When procedural, encode the learning as concise ordered steps in `Learning`.
 
 ## Failure Recovery Protocol
