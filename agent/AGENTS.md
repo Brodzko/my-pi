@@ -16,11 +16,12 @@ Do not go outside unless you're explicitly asked to or you ask for permission. Y
 ## Execution Loop (mandatory)
 
 For major or high-risk tasks (or when review/approval is needed before implementation):
+
 1. Restate the goal and constraints in 1-3 bullets.
 2. Propose a short plan (2-5 steps) before making edits.
 3. Ask for review/approval if requested or implied by the task.
 4. Execute incrementally in small, reviewable changes.
-5. Verify with relevant checks.
+5. Verify: after editing, always run `get_diagnostics` on every touched file for fast, incremental feedback. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
 6. Reflect briefly on uncertainty, failed attempts, and what should be reused.
 
 For minor, low-risk tasks, proceed directly without mandatory upfront plan approval.
@@ -28,11 +29,13 @@ For minor, low-risk tasks, proceed directly without mandatory upfront plan appro
 ## Continuous Learning
 
 Primary memory is **per-project** and must be proactively maintained in the current cwd:
+
 - Directory: `.brodzko/memory/`
 - One memory per file (no giant append-only file)
 - File names must be descriptive and grep-friendly, e.g. `vite-ts-path-alias-resolution.md`
 
 At the start of each task, do targeted retrieval from:
+
 1. Project memory: `.brodzko/memory/**/*.md` (primary)
 2. Global memory (fallback):
    - `~/.pi/agent/LEARNINGS.md`
@@ -44,6 +47,7 @@ Use `grep` with 3-5 semantically related keywords (mix intent words + concrete t
 Prefer iterative retrieval: start broad, refine with adjacent terms from matches, stop when evidence is sufficient.
 
 When project memory is missing, initialize it:
+
 - Create `.brodzko/memory/`
 - Ensure `.brodzko/` is gitignored (prefer `.git/info/exclude` for local-only ignore; use `.gitignore` only if requested)
 - Create `.brodzko/memory/_template.md` if missing, using the required format below
@@ -55,25 +59,29 @@ Each memory must include `## Trigger`, `## Learning`, `## Reflection`, and `## R
 
 ```md
 ---
-keywords: ["vite", "tsconfig", "path-alias"]
-summary: "Fix TS path aliases by aligning tsconfig paths and bundler resolver."
-tags: ["tooling", "typescript", "build"]
-related: ["tsconfig-paths", "vite.config.ts"]
+keywords: ['vite', 'tsconfig', 'path-alias']
+summary: 'Fix TS path aliases by aligning tsconfig paths and bundler resolver.'
+tags: ['tooling', 'typescript', 'build']
+related: ['tsconfig-paths', 'vite.config.ts']
 ---
 
 ## Trigger
+
 - When imports resolve in editor but fail at runtime/build.
 
 ## Learning
+
 - Keep alias source-of-truth in one place and derive secondary config.
 
 ## Reflection
+
 - What we did: Aligned alias config between TypeScript and bundler.
 - Why we did it: Runtime/build resolution diverged from editor behavior.
 - Where we failed/succeeded: Failed with split sources of truth; succeeded after consolidating alias ownership.
 - How we arrived here: Reproduced failure, compared resolver configs, then validated with build/typecheck.
 
 ## References
+
 - apps/web/vite.config.ts
 - tsconfig.base.json
 ```
@@ -84,12 +92,14 @@ Capture only high-signal, reusable lessons.
 Do not store one-off trivia, obvious basics, or transient noise.
 
 Record or update a project memory when at least one is true:
+
 - The issue recurred or is likely to recur.
 - The fix required non-obvious reasoning.
 - The decision affects architecture, contracts, or team conventions.
 - The failure mode is expensive if repeated.
 
 Before creating a new memory file, run a duplicate check:
+
 - Grep `.brodzko/memory/` using candidate keywords/tags/error tokens.
 - If overlap exists, update the existing file instead of creating a near-duplicate.
 
@@ -99,12 +109,14 @@ Keep entries concise, specific, and searchable.
 ### Session Reflection & Procedural Memory (required)
 
 At the end of every meaningful task/session, run a short reflective pass and update project memory proactively (without waiting for explicit user request):
+
 1. What triggered the work? (bug, request, failure mode, decision point)
 2. What changed in behavior/process/tooling that should be repeated?
 3. Is this a new memory or an update to an existing one?
 4. Which references make the memory verifiable (file paths, commands, PR/commit)?
 
 Store this as either:
+
 - **Reflective memory**: decision heuristics, tradeoff rationale, process lessons.
 - **Procedural memory**: step-by-step repeatable workflow/checklist for future tasks.
 
@@ -115,6 +127,7 @@ When procedural, encode the learning as concise ordered steps in `Learning`.
 ## Failure Recovery Protocol
 
 If verification fails:
+
 1. Classify the failure (type error, test regression, formatting, logic mismatch, tooling).
 2. State the likely root cause in one sentence.
 3. Apply the smallest fix first.
@@ -148,17 +161,25 @@ If verification fails:
 - Immutable data patterns — no mutation of props, state, or shared objects
 - Early returns over nested conditionals
 - Colocation — keep related things close together
+- Colocate types in the owning module by default; extract only genuinely shared, narrow contracts
+- When a Zod schema and TS type describe the same shape, infer with `z.infer<typeof schema>` instead of duplicating shape definitions
 - Delete dead code instead of commenting it out
 - Prefer using utilities from Remeda when possible
+- Prefer declarative, data-first pipelines over imperative control flow when readability is equal or better
+- Prefer mature, well-maintained third-party libraries for commodity concerns (validation, globbing, caching, timeouts, path discovery) instead of custom implementations
 
 ## Patterns to Avoid
 
 - Premature abstraction — duplication is cheaper than the wrong abstraction
 - God components or utility files that grow unbounded
+- Catch-all `types.ts` files that become dumping grounds
+- Standalone type/contract files when types can be colocated in the owning module; extract only narrow shared contracts when truly needed
 - Barrel files (`index.ts` re-exports) unless explicitly requested
 - Wrapping native elements without forwarding refs and props
 - `useEffect` for derived state — compute it during render instead
 - Syncing state between components — lift it up or use context
+- Hand-rolled implementations of solved infrastructure problems when a vetted library fits the need
+- `let`, `for`/`while`, and `push`-style mutation in transformation logic when a clear immutable/declarative alternative exists
 
 ## When Refactoring
 
@@ -178,7 +199,7 @@ If verification fails:
 
 - [ ] Goal implemented as requested
 - [ ] Scope respected (no unrelated refactors)
-- [ ] `npm run format` and `npm run tsc` run in relevant package(s)
+- [ ] `get_diagnostics` run on all touched files (final pass)
 - [ ] Relevant tests run, or explicitly called out as not run
 - [ ] Risks, assumptions, and follow-ups stated clearly
 - [ ] Reusable lesson captured in `.brodzko/memory/` (project) when applicable; promote to `~/.pi/agent/LEARNINGS.md` only if cross-project
