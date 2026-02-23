@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   less \
   unzip \
+  htop \
   && rm -rf /var/lib/apt/lists/*
 
 # AWS CLI v2
