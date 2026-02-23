@@ -9,7 +9,9 @@ const SessionNotifyConfigSchema = z
     enabled: z.boolean().default(true),
     statusKey: z.string().min(1).default('session-notify'),
     notificationAutoClearMs: z.number().int().min(0).default(4000),
-    soundMode: z.literal('terminal-bell').default('terminal-bell'),
+    soundMode: z
+      .enum(['auto', 'terminal-osc', 'terminal-bell'])
+      .default('auto'),
     bellCount: z.number().int().min(1).max(5).default(1),
   })
   .strict();

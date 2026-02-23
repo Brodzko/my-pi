@@ -59,7 +59,10 @@ const formatElapsed = (elapsedMs: number): string => {
   return `${minutes}m ${seconds}s`;
 };
 
-const playNotificationSound = () => {
+const sanitizeOscText = (value: string): string =>
+  value.replace(/[\x1b\x07;\\]/g, ' ').trim();
+
+const playTerminalBell = () => {
   if (!process.stdout.writable) {
     return;
   }
@@ -67,13 +70,52 @@ const playNotificationSound = () => {
   process.stdout.write('\x07'.repeat(sessionNotifyConfig.bellCount));
 };
 
-const showTurnTiming = (ctx: ExtensionContext, state: SessionNotifyState) => {
-  if (!state.turnStartAtMs) {
+const playTerminalOscNotification = (title: string, body: string) => {
+  if (!process.stdout.writable) {
     return;
   }
 
+  const safeTitle = sanitizeOscText(title);
+  const safeBody = sanitizeOscText(body);
+
+  if (process.env.KITTY_WINDOW_ID) {
+    process.stdout.write(`\x1b]99;i=1:d=0;${safeTitle}\x1b\\`);
+    process.stdout.write(`\x1b]99;i=1:p=body;${safeBody}\x1b\\`);
+    return;
+  }
+
+  process.stdout.write(`\x1b]777;notify;${safeTitle};${safeBody}\x07`);
+};
+
+const playNotificationSound = (elapsedLabel: string) => {
+  const title = 'Pi';
+  const body = `turn complete in ${elapsedLabel}`;
+
+  if (sessionNotifyConfig.soundMode === 'terminal-bell') {
+    playTerminalBell();
+    return;
+  }
+
+  if (sessionNotifyConfig.soundMode === 'terminal-osc') {
+    playTerminalOscNotification(title, body);
+    return;
+  }
+
+  playTerminalOscNotification(title, body);
+  playTerminalBell();
+};
+
+const showTurnTiming = (
+  ctx: ExtensionContext,
+  state: SessionNotifyState
+): string | undefined => {
+  if (!state.turnStartAtMs) {
+    return undefined;
+  }
+
   const elapsedMs = Math.max(0, Date.now() - state.turnStartAtMs);
-  const message = `turn complete in ${formatElapsed(elapsedMs)}`;
+  const elapsedLabel = formatElapsed(elapsedMs);
+  const message = `turn complete in ${elapsedLabel}`;
 
   ctx.ui.notify(message, 'info');
   ctx.ui.setStatus(
@@ -89,6 +131,8 @@ const showTurnTiming = (ctx: ExtensionContext, state: SessionNotifyState) => {
       state.clearStatusTimeout = undefined;
     }, sessionNotifyConfig.notificationAutoClearMs);
   }
+
+  return elapsedLabel;
 };
 
 export const setupSessionNotifyExtension = (pi: ExtensionAPI) => {
@@ -109,8 +153,12 @@ export const setupSessionNotifyExtension = (pi: ExtensionAPI) => {
       return;
     }
 
-    playNotificationSound();
-    showTurnTiming(ctx, state);
+    const elapsedLabel = showTurnTiming(ctx, state);
+    if (!elapsedLabel) {
+      return;
+    }
+
+    playNotificationSound(elapsedLabel);
   });
 
   pi.on('session_shutdown', async (_event, ctx) => {

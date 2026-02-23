@@ -2,6 +2,6 @@
   "enabled": true,
   "statusKey": "session-notify",
   "notificationAutoClearMs": 4000,
-  "soundMode": "terminal-bell",
+  "soundMode": "auto",
   "bellCount": 1
 }
