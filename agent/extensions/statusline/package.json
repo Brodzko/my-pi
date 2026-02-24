@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "Custom status line for pi — editor border info + context usage footer",
+  "scripts": {
+    "format": "node -e \"console.log('statusline: no local formatter configured')\"",
+    "lint": "tsc --noEmit",
+    "tsc": "tsc --noEmit",
+    "test": "node --test"
+  },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "^0.52.12",
     "@types/node": "^22.0.0",
