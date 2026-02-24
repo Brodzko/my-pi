@@ -6,7 +6,9 @@
     "amazon-bedrock/eu.anthropic.claude-opus-4-6-v1",
     "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
     "openai-codex/gpt-5.3-codex",
-    "openai-codex/gpt-5.2-codex"
+    "openai-codex/gpt-5.2-codex",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-sonnet-4-6"
   ],
   "hideThinkingBlock": true,
   "defaultThinkingLevel": "medium",
@@ -15,5 +17,8 @@
     "./extensions/sessions",
     "!./extensions/get-diagnostics/index.ts"
   ],
-  "skills": ["~/rossum/coding-agents/pi/skills", "./skills"]
+  "skills": [
+    "~/rossum/coding-agents/pi/skills",
+    "./skills"
+  ]
 }

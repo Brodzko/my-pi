@@ -1,13 +1,16 @@
-import type {
-  ExtensionContext,
-  ThemeColor,
-} from '@mariozechner/pi-coding-agent';
+import type { ExtensionContext, ThemeColor } from '@mariozechner/pi-coding-agent';
 import type { ReadonlyFooterDataProvider } from '@mariozechner/pi-coding-agent';
 import type { TUI } from '@mariozechner/pi-tui';
 import { truncateToWidth, visibleWidth } from '@mariozechner/pi-tui';
+import type { StatuslineEditor, EditorInfo } from './editor';
 import { formatTokens } from './format';
 import { PROGRESS_WIDTH, renderProgressBar } from './progress-bar';
-import type { StatuslineEditor, EditorInfo } from './editor';
+import { renderSubscriptionLines, modelProviderToUsageProvider } from './subscription-footer';
+import {
+  fetchSubscriptionUsageEntries,
+  type ProviderId,
+  type SubscriptionUsageEntry,
+} from './subscription-limits';
 
 type ThemeFg = { fg: (color: ThemeColor, text: string) => string };
 
@@ -16,6 +19,8 @@ type FooterDeps = {
   ctx: ExtensionContext;
   buildEditorInfo: (ctx: ExtensionContext) => EditorInfo;
 };
+
+const subscriptionRefreshMs = 60_000;
 
 export const createFooter = (
   tui: TUI,
@@ -30,63 +35,99 @@ export const createFooter = (
   });
 
   let lastThinking = '';
+  let subscriptionEntries: SubscriptionUsageEntry[] | null = null;
+  let lastSubscriptionFetchAt = 0;
+  let isSubscriptionLoading = false;
+  let lastActiveUsageProvider: ProviderId | null = null;
+
+  const refreshSubscriptionSummary = async () => {
+    if (isSubscriptionLoading) return;
+    isSubscriptionLoading = true;
+
+    try {
+      const activeUsageProvider = modelProviderToUsageProvider(deps.ctx.model?.provider);
+      if (!activeUsageProvider) {
+        subscriptionEntries = null;
+        lastActiveUsageProvider = null;
+        lastSubscriptionFetchAt = Date.now();
+        tui.requestRender();
+        return;
+      }
+
+      subscriptionEntries = await fetchSubscriptionUsageEntries(
+        deps.ctx,
+        activeUsageProvider
+      );
+      lastActiveUsageProvider = activeUsageProvider;
+      lastSubscriptionFetchAt = Date.now();
+      tui.requestRender();
+    } finally {
+      isSubscriptionLoading = false;
+    }
+  };
+
+  void refreshSubscriptionSummary();
 
   return {
     dispose: unsub,
     invalidate() {},
     render(width: number): string[] {
-      // Keep editor in sync on each footer render.
-      // The editor renders before the footer in the same TUI frame, so any
-      // state we set here only takes effect on the *next* frame. When thinking
-      // changes we therefore request an extra render so the editor catches up
-      // on the very next frame rather than waiting for the next keystroke.
       const info = deps.buildEditorInfo(deps.ctx);
-      const ed = deps.getEditor();
-      if (ed) {
-        ed.setBorderTheme(theme);
-        ed.updateInfo(info);
+      const editor = deps.getEditor();
+      if (editor) {
+        editor.setBorderTheme(theme);
+        editor.updateInfo(info);
       }
+
       if (info.thinking !== lastThinking) {
         lastThinking = info.thinking;
         tui.requestRender();
       }
 
-      const usage = deps.ctx.getContextUsage();
-      const statuses = footerData.getExtensionStatuses();
-
-      const statusStr = renderStatuses(statuses, theme);
-
-      if (!usage || usage.percent === null) {
-        return renderNoUsage(statusStr, theme, width);
+      const activeUsageProvider = modelProviderToUsageProvider(deps.ctx.model?.provider);
+      const providerChanged = activeUsageProvider !== lastActiveUsageProvider;
+      if (providerChanged && !isSubscriptionLoading) {
+        subscriptionEntries = null;
+        lastSubscriptionFetchAt = 0;
+        void refreshSubscriptionSummary();
       }
 
-      return renderWithUsage(usage, statusStr, theme, width);
+      if (
+        !isSubscriptionLoading &&
+        Date.now() - lastSubscriptionFetchAt >= subscriptionRefreshMs
+      ) {
+        void refreshSubscriptionSummary();
+      }
+
+      const usage = deps.ctx.getContextUsage();
+      const statuses = renderStatuses(footerData.getExtensionStatuses(), theme);
+      const primaryLine =
+        !usage || usage.percent === null
+          ? renderNoUsage(statuses, theme, width)
+          : renderWithUsage(usage, statuses, theme, width);
+
+      return [
+        primaryLine,
+        ...renderSubscriptionLines(subscriptionEntries, isSubscriptionLoading, theme, width),
+      ];
     },
   };
 };
 
-// ── Private helpers ─────────────────────────────────────────────────
-
 const renderStatuses = (
   statuses: ReadonlyMap<string, string>,
   theme: ThemeFg
-): string => {
-  const parts: string[] = [];
-  for (const [, text] of statuses) {
-    parts.push(theme.fg('dim', text));
-  }
-  return parts.length > 0 ? parts.join(theme.fg('dim', ' │ ')) : '';
-};
+): string =>
+  Array.from(statuses.values())
+    .map(text => theme.fg('dim', text))
+    .join(theme.fg('dim', ' │ '));
 
-const renderNoUsage = (
-  statusStr: string,
-  theme: ThemeFg,
-  width: number
-): string[] => {
+const renderNoUsage = (statusStr: string, theme: ThemeFg, width: number): string => {
   const left = theme.fg('dim', 'Ready');
-  if (!statusStr) return [truncateToWidth(left, width)];
+  if (!statusStr) return truncateToWidth(left, width);
+
   const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(statusStr));
-  return [truncateToWidth(left + ' '.repeat(gap) + statusStr, width)];
+  return truncateToWidth(`${left}${' '.repeat(gap)}${statusStr}`, width);
 };
 
 const renderWithUsage = (
@@ -98,20 +139,14 @@ const renderWithUsage = (
   statusStr: string,
   theme: ThemeFg,
   width: number
-): string[] => {
+): string => {
   const percent = Math.min(100, Math.round(usage.percent!));
-  const capacity = formatTokens(usage.contextWindow);
   const bar = renderProgressBar(percent, PROGRESS_WIDTH, theme);
-  const label = theme.fg('dim', ` ${percent}%/${capacity}`);
-  const leftPart = bar + label;
+  const label = theme.fg('dim', ` ${percent}%/${formatTokens(usage.contextWindow)}`);
+  const left = `${bar}${label}`;
 
-  if (!statusStr) {
-    return [truncateToWidth(leftPart, width)];
-  }
+  if (!statusStr) return truncateToWidth(left, width);
 
-  const gap = Math.max(
-    1,
-    width - visibleWidth(leftPart) - visibleWidth(statusStr)
-  );
-  return [truncateToWidth(leftPart + ' '.repeat(gap) + statusStr, width)];
+  const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(statusStr));
+  return truncateToWidth(`${left}${' '.repeat(gap)}${statusStr}`, width);
 };
