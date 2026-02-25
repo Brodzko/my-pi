@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.54.2",
+  "lastChangelogVersion": "0.55.0",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-4-6",
   "enabledModels": [
@@ -11,7 +11,7 @@
     "anthropic/claude-sonnet-4-6"
   ],
   "hideThinkingBlock": true,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "xhigh",
   "extensions": [
     "~/rossum/coding-agents/pi/extensions",
     "./extensions/sessions",
