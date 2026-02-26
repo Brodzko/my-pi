@@ -7,6 +7,7 @@ Colocated session-related extensions:
 - `session-reference` — resolves `@@<session-id>` references and injects summaries.
 - `session-name-widget` — displays the current session name above the editor.
 - `session-notify` — plays a completion sound and shows turn duration in TUI-only status/notification.
+- `session-handoff` — generates a continuation-ready handoff summary and opens a new prefilled session.
 
 Group-local shared utilities live in `shared/`. Cross-extension utilities shared with other extension groups (for example `quick-open`) live in `../shared/`.
 
@@ -19,6 +20,7 @@ Configured in `package.json` under `pi.extensions`:
 - `./session-reference/src/index.ts`
 - `./session-name-widget/src/index.ts`
 - `./session-notify/src/index.ts`
+- `./session-handoff/src/index.ts`
 
 ## Scripts
 
