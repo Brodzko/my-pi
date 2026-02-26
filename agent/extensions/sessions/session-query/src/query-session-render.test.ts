@@ -54,36 +54,44 @@ describe('createQuerySessionRenderers', () => {
     expect(lines[0]).toContain('what happened?');
   });
 
-  it('hides answer when collapsed and shows it when expanded', () => {
+  it('shows confidence summary when collapsed', () => {
     const renderers = createQuerySessionRenderers();
-    renderers.renderCall(
-      {
-        session: 'abc-session',
-        question: 'what happened?',
-      },
-      theme as never
-    );
 
     const collapsed = renderers.renderResult(
       successResult,
-      {
-        expanded: false,
-        isPartial: false,
-      },
+      { expanded: false, isPartial: false },
       theme as never
     );
-    const collapsedLines = collapsed.render(120);
-    expect(collapsedLines.length).toBe(1);
+    const collapsedOutput = collapsed.render(120).join('\n');
+
+    expect(collapsedOutput).toContain('confidence: high');
+    expect(collapsedOutput).not.toContain('Answer body');
+  });
+
+  it('shows full answer text when expanded', () => {
+    const renderers = createQuerySessionRenderers();
 
     const expanded = renderers.renderResult(
       successResult,
-      {
-        expanded: true,
-        isPartial: false,
-      },
+      { expanded: true, isPartial: false },
       theme as never
     );
-    const expandedLines = expanded.render(120);
-    expect(expandedLines.join('\n')).toContain('Answer body');
+    const expandedOutput = expanded.render(120).join('\n');
+
+    expect(expandedOutput).toContain('confidence: high');
+    expect(expandedOutput).toContain('Answer body');
+  });
+
+  it('returns empty component while partial', () => {
+    const renderers = createQuerySessionRenderers();
+
+    const partial = renderers.renderResult(
+      successResult,
+      { expanded: false, isPartial: true },
+      theme as never
+    );
+    const lines = partial.render(120);
+
+    expect(lines).toHaveLength(0);
   });
 });

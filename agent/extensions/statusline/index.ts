@@ -11,6 +11,7 @@ export default (pi: ExtensionAPI) => {
   let editor: StatuslineEditor | null = null;
   let currentCtx: ExtensionContext | null = null;
   let cachedGitStatus: GitStatus = { ...EMPTY_GIT_STATUS };
+  let isTurnOngoing = false;
 
   const refreshGitStatus = async () => {
     const next = await fetchGitStatus(pi);
@@ -35,6 +36,7 @@ export default (pi: ExtensionAPI) => {
 
   pi.on('session_start', async (_event, ctx) => {
     currentCtx = ctx;
+    isTurnOngoing = false;
     await refreshGitStatus();
 
     ctx.ui.setEditorComponent((tui, editorTheme, keybindings) => {
@@ -52,7 +54,12 @@ export default (pi: ExtensionAPI) => {
         tui,
         theme,
         footerData,
-        { ctx, getEditor: () => editor, buildEditorInfo },
+        {
+          ctx,
+          getEditor: () => editor,
+          buildEditorInfo,
+          isTurnOngoing: () => isTurnOngoing,
+        },
         async () => {
           await refreshGitStatus();
           refreshEditor();
@@ -63,9 +70,22 @@ export default (pi: ExtensionAPI) => {
     });
   });
 
+  pi.on('turn_start', async (_event, ctx) => {
+    currentCtx = ctx;
+    isTurnOngoing = true;
+    refreshEditor();
+  });
+
   pi.on('turn_end', async (_event, ctx) => {
     currentCtx = ctx;
+    isTurnOngoing = false;
     await refreshGitStatus();
+    refreshEditor();
+  });
+
+  pi.on('agent_end', async (_event, ctx) => {
+    currentCtx = ctx;
+    isTurnOngoing = false;
     refreshEditor();
   });
 
@@ -76,6 +96,7 @@ export default (pi: ExtensionAPI) => {
 
   pi.on('session_switch', async (_event, ctx) => {
     currentCtx = ctx;
+    isTurnOngoing = false;
     await refreshGitStatus();
     refreshEditor();
   });

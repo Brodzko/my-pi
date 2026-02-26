@@ -1,36 +1,17 @@
 import type { AgentToolResult } from '@mariozechner/pi-agent-core';
-import {
-  getMarkdownTheme,
-  type ExtensionContext,
-} from '@mariozechner/pi-coding-agent';
-import {
-  Container,
-  Markdown,
-  Spacer,
-  Text,
-  truncateToWidth,
-} from '@mariozechner/pi-tui';
+import { type ExtensionContext } from '@mariozechner/pi-coding-agent';
+import { Text, truncateToWidth } from '@mariozechner/pi-tui';
 import type { QuerySessionResult } from './types';
 
 const MAX_CALL_PREVIEW_CHARS = 72;
 const QUERY_SESSION_TOOL_ICON = '🔎';
-const SPINNER_FRAMES = [
-  '⠋',
-  '⠙',
-  '⠹',
-  '⠸',
-  '⠼',
-  '⠴',
-  '⠦',
-  '⠧',
-  '⠇',
-  '⠏',
-] as const;
-const SPINNER_INTERVAL_MS = 80;
+const PENDING_INDICATOR = '⋯';
 
 type ToolTheme = ExtensionContext['ui']['theme'];
 
 type ThemeTone = Parameters<ToolTheme['fg']>[0];
+
+const EMPTY = { render: () => [] as string[], invalidate: () => undefined };
 
 const applyFg = (theme: ToolTheme, tone: ThemeTone, text: string): string => {
   try {
@@ -133,25 +114,12 @@ const getTextContent = (result: AgentToolResult<unknown>): string =>
     .trim();
 
 export const createQuerySessionRenderers = () => {
-  let lastArgs: unknown;
-  let completed = false;
-
   return {
     renderCall: (args: unknown, theme: ToolTheme) => {
-      lastArgs = args;
-      completed = false;
-
       return {
         render: (width: number) => {
           try {
-            if (completed) {
-              return [];
-            }
-
-            const frame =
-              Math.floor(Date.now() / SPINNER_INTERVAL_MS) %
-              SPINNER_FRAMES.length;
-            const line = `${applyFg(theme, 'warning', SPINNER_FRAMES[frame])} ${QUERY_SESSION_TOOL_ICON} ${formatQuerySessionTarget(args, theme)}`;
+            const line = `${applyFg(theme, 'warning', PENDING_INDICATOR)} ${QUERY_SESSION_TOOL_ICON} ${formatQuerySessionTarget(args, theme)}`;
             return [truncateToWidth(line, width)];
           } catch {
             return [truncateToWidth('🔎 query_session', width)];
@@ -166,38 +134,28 @@ export const createQuerySessionRenderers = () => {
       theme: ToolTheme
     ) => {
       if (options.isPartial) {
-        return {
-          render: (width: number) => [
-            truncateToWidth(applyFg(theme, 'muted', '…'), width),
-          ],
-          invalidate: () => undefined,
-        };
+        return EMPTY;
       }
 
-      completed = true;
+      const confidence = result.details?.confidence;
+      const statusLine = confidence
+        ? applyFg(theme, 'muted', `(confidence: ${confidence})`)
+        : undefined;
 
-      const statusLine = `${applyFg(theme, 'success', '✓')} ${QUERY_SESSION_TOOL_ICON} ${formatQuerySessionTarget(lastArgs, theme)}`;
-      const answerMarkdown = getTextContent(result);
-
-      if (!options.expanded || !answerMarkdown) {
-        return new Text(statusLine, 0, 0);
+      if (!options.expanded) {
+        if (statusLine) return new Text(statusLine, 0, 0);
+        return EMPTY;
       }
 
-      try {
-        const container = new Container();
-
-        container.addChild(new Text(statusLine, 0, 0));
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new Markdown(answerMarkdown, 0, 0, getMarkdownTheme(), {
-            color: (text: string) => applyFg(theme, 'toolOutput', text),
-          })
-        );
-
-        return container;
-      } catch {
-        return new Text('✓ 🔎 query_session', 0, 0);
+      // Expanded: meta + full answer text
+      const text = getTextContent(result);
+      if (text) {
+        if (statusLine) return new Text(`${statusLine}\n${text}`, 0, 0);
+        return new Text(text, 0, 0);
       }
+
+      if (statusLine) return new Text(statusLine, 0, 0);
+      return EMPTY;
     },
   };
 };

@@ -38,7 +38,7 @@ export const readConfig: MinimalToolConfig<ReadArgs, ReadToolDetails> = {
       return `${name}${theme.fg('mdHeading', `:1-${args.limit}`)}`;
     return name;
   },
-  meta: (result) => {
+  meta: result => {
     const truncation = result.details?.truncation;
     if (truncation) return truncationMeta(truncation);
     const text = textContent(result);
@@ -54,31 +54,30 @@ export const readConfig: MinimalToolConfig<ReadArgs, ReadToolDetails> = {
 
 type WriteArgs = { path: string; content: string };
 
-export const writeConfig: MinimalToolConfig<WriteArgs, Record<string, never>> =
-  {
-    icon: '📝',
-    target: (args, theme) =>
-      theme.bold('write') + ' ' + pathColor(theme, basename(args.path)),
-    meta: (result) => {
-      const text = textContent(result);
-      const sizeMatch = text.match(/(\d+[\d.]*\s*(?:bytes|[KMG]B))/i);
-      return sizeMatch ? `(${sizeMatch[1]})` : undefined;
-    },
-    body: (args, _result, theme) => {
-      const { preview, full, truncated } = previewLines(
-        args.content,
-        PREVIEW_LINES
-      );
-      const suffix = truncated
-        ? '\n' +
-          theme.fg(
-            'muted',
-            `… (${args.content.split('\n').length} lines total)`
-          )
-        : '';
-      return { preview: preview + suffix, full };
-    },
-  };
+export const writeConfig: MinimalToolConfig<
+  WriteArgs,
+  Record<string, never>
+> = {
+  icon: '📝',
+  target: (args, theme) =>
+    theme.bold('write') + ' ' + pathColor(theme, basename(args.path)),
+  meta: result => {
+    const text = textContent(result);
+    const sizeMatch = text.match(/(\d+[\d.]*\s*(?:bytes|[KMG]B))/i);
+    return sizeMatch ? `(${sizeMatch[1]})` : undefined;
+  },
+  body: (args, _result, theme) => {
+    const { preview, full, truncated } = previewLines(
+      args.content,
+      PREVIEW_LINES
+    );
+    const suffix = truncated
+      ? '\n' +
+        theme.fg('muted', `… (${args.content.split('\n').length} lines total)`)
+      : '';
+    return { preview: preview + suffix, full };
+  },
+};
 
 // ── edit ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +87,7 @@ export const editConfig: MinimalToolConfig<EditArgs, EditToolDetails> = {
   icon: '✏️',
   target: (args, theme) =>
     theme.bold('edit') + ' ' + pathColor(theme, basename(args.path)),
-  meta: (result) => {
+  meta: result => {
     const diff = result.details?.diff;
     if (!diff) return undefined;
     const added = (diff.match(/^\+[^+]/gm) ?? []).length;
@@ -136,7 +135,7 @@ export const grepConfig: MinimalToolConfig<GrepArgs, GrepToolDetails> = {
     if (args.limit) parts.push(theme.fg('muted', `--limit=${args.limit}`));
     return parts.join(' ');
   },
-  meta: (result) => truncationMeta(result.details?.truncation),
+  meta: result => truncationMeta(result.details?.truncation),
   body: (_args, result, theme) => expandOnlyBody(result, theme),
 };
 
@@ -152,7 +151,7 @@ export const findConfig: MinimalToolConfig<FindArgs, FindToolDetails> = {
     if (args.limit) parts.push(theme.fg('muted', `--limit=${args.limit}`));
     return parts.join(' ');
   },
-  meta: (result) => truncationMeta(result.details?.truncation),
+  meta: result => truncationMeta(result.details?.truncation),
   body: (_args, result, theme) => expandOnlyBody(result, theme),
 };
 
@@ -167,8 +166,21 @@ export const lsConfig: MinimalToolConfig<LsArgs, LsToolDetails> = {
     if (args.limit) parts.push(theme.fg('muted', `--limit=${args.limit}`));
     return parts.join(' ');
   },
-  meta: (result) => truncationMeta(result.details?.truncation),
-  renderResultComponent: (statusLine, _args, result, options, theme) =>
+  meta: result => {
+    const text = textContent(result).trim();
+    if (!text || text === '(empty directory)') return '(empty)';
+    const entries = text.split('\n').filter(line => !line.startsWith('['));
+    const dirCount = entries.filter(e => e.endsWith('/')).length;
+    const fileCount = entries.length - dirCount;
+    const parts: string[] = [];
+    if (dirCount > 0) parts.push(`${dirCount} dir${dirCount !== 1 ? 's' : ''}`);
+    if (fileCount > 0)
+      parts.push(`${fileCount} file${fileCount !== 1 ? 's' : ''}`);
+    const summary = parts.length > 0 ? parts.join(', ') : 'empty';
+    const truncation = truncationMeta(result.details?.truncation);
+    return truncation ? `(${summary}, ${truncation})` : `(${summary})`;
+  },
+  renderResultComponent: (statusLine, result, options, theme) =>
     createLsResultComponent(statusLine, result, options, theme),
 };
 
@@ -187,13 +199,13 @@ export const bashConfig: MinimalToolConfig<BashArgs, BashToolDetails> = {
       parts.push(theme.fg('muted', `(timeout ${args.timeout}s)`));
     return parts.join(' ');
   },
-  meta: (result) => truncationMeta(result.details?.truncation),
+  meta: result => truncationMeta(result.details?.truncation),
   body: (_args, result, theme) => {
     const output = textContent(result).trim();
     if (!output) return undefined;
     const styledOutput = output
       .split('\n')
-      .map((line) => theme.fg('toolOutput', line))
+      .map(line => theme.fg('toolOutput', line))
       .join('\n');
     const { preview, full, truncated } = previewLines(
       styledOutput,

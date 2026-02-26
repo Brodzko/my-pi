@@ -24,6 +24,10 @@ export type ProviderStatus = {
 };
 
 export type GetDiagnosticsResult = {
+  request?: {
+    path: string;
+    providers?: string[];
+  };
   diagnostics: NormalizedDiagnostic[];
   providerStatus: Record<string, ProviderStatus>;
   truncated: boolean;
