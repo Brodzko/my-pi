@@ -26,7 +26,7 @@ const GetDiagnosticsParams = Type.Object({
   providers: Type.Optional(
     Type.Array(StringEnum(["typescript", "eslint"] as const), {
       description:
-        'Diagnostic providers to run. Defaults to ["typescript"]. Use ["typescript", "eslint"] for both.',
+        'Diagnostic providers to run. Defaults to ["typescript"]. Pass ["eslint"] for lint-only checks. Run one provider at a time — do NOT pass both together.',
     }),
   ),
   timeoutMs: Type.Optional(
@@ -46,7 +46,7 @@ export const registerGetDiagnosticsTool = (pi: ExtensionAPI, service: Diagnostic
     name: "get_diagnostics",
     label: "Diagnostics",
     description:
-      "Get TypeScript and ESLint diagnostics for a file or directory. Returns type errors, lint violations, and other issues. Faster than running tsc or eslint CLI \u2014 uses cached in-memory analysis. Use after editing files to verify changes.",
+      'Get TypeScript or ESLint diagnostics for a file or directory. Returns type errors or lint violations. Faster than running tsc or eslint CLI \u2014 uses cached in-memory analysis. Use after editing files to verify changes. Defaults to TypeScript type checking. Pass providers: ["eslint"] for lint checks. Always run one provider at a time, not both.',
     parameters: GetDiagnosticsParams,
 
     async execute(

@@ -38,6 +38,13 @@ const testProviderContract = (name: string, create: () => DiagnosticsProvider) =
       const ext = provider.supportedExtensions[0]!;
       expect(provider.isFileSupported(`/deep/nested/path/file.${ext}`)).toBe(true);
     });
+
+    it("defaultTimeoutMs is undefined or a positive number", () => {
+      const provider = create();
+      if (provider.defaultTimeoutMs !== undefined) {
+        expect(provider.defaultTimeoutMs).toBeGreaterThan(0);
+      }
+    });
   });
 };
 
@@ -61,6 +68,8 @@ const createEslintStub = (): DiagnosticsProvider => {
   return {
     id: "eslint",
     supportedExtensions,
+    defaultTimeoutMs: 120_000,
+    proactive: false,
     isFileSupported: (f) => extPattern.test(f),
     getDiagnostics: async () => [],
   };

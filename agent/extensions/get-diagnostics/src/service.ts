@@ -1,3 +1,15 @@
+/**
+ * Diagnostics service — orchestrates providers and caches results.
+ *
+ * Implements the VS Code model: diagnostics are computed proactively on file
+ * read/write (via syncDocument) and served from cache on getDiagnostics.
+ *
+ * Cache invalidation uses a version counter per file:
+ * - syncDocument bumps version and starts a background check tagged with that version
+ * - Background check stores result only if version still matches (prevents stale data)
+ * - getDiagnostics returns cached result only if version matches (cache hit)
+ * - Cache miss falls through to live provider call (still fast with warm providers)
+ */
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { glob } from "tinyglobby";
@@ -6,10 +18,19 @@ import * as R from "remeda";
 import type { DiagnosticsProvider } from "./providers/types";
 import type { GetDiagnosticsResult, NormalizedDiagnostic, ProviderStatus } from "./types";
 import { log } from "./logger";
+import { findPrewarmFile } from "./prewarm-discovery";
 
 const DEFAULT_MAX_FILES = 200;
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_DIAGNOSTICS = 2000;
+
+/**
+ * Maximum cached entries per provider. In long sessions the agent may touch
+ * hundreds of files; caching all of them wastes memory for files unlikely to
+ * be re-checked. When the limit is hit, the oldest entries (by insertion /
+ * last-update order) are evicted.
+ */
+const MAX_CACHE_ENTRIES_PER_PROVIDER = 200;
 
 const SEVERITY_ORDER: Record<string, number> = {
   error: 0,
@@ -26,6 +47,28 @@ export type ServiceParams = {
   timeoutMs?: number;
   maxFiles?: number;
 };
+
+// --- Diagnostic cache ---
+
+type CachedEntry = {
+  diagnostics: NormalizedDiagnostic[];
+  version: number;
+};
+
+/**
+ * Per-provider, per-file diagnostic cache.
+ * Outer key: provider id. Inner key: absolute file path.
+ */
+type DiagnosticCache = Map<string, Map<string, CachedEntry>>;
+
+/**
+ * File version tracker. Each syncDocument bumps the version.
+ * Background checks tag their results with the version at request time;
+ * results are only stored if the version still matches.
+ */
+type FileVersions = Map<string, number>;
+
+// --- File resolution ---
 
 const resolveFiles = async (
   targetPath: string,
@@ -78,6 +121,8 @@ const resolveFiles = async (
   };
 };
 
+// --- Sorting and dedup ---
+
 const sortDiagnostics = (diagnostics: NormalizedDiagnostic[]): NormalizedDiagnostic[] =>
   R.pipe(
     diagnostics,
@@ -97,6 +142,8 @@ const dedupeDiagnostics = (diagnostics: NormalizedDiagnostic[]): NormalizedDiagn
     ),
   );
 
+// --- Service ---
+
 export type DiagnosticsService = {
   getDiagnostics: (params: ServiceParams) => Promise<GetDiagnosticsResult>;
   prewarm: (cwd: string) => void;
@@ -106,17 +153,139 @@ export type DiagnosticsService = {
 
 export const createDiagnosticsService = (providers: DiagnosticsProvider[]): DiagnosticsService => {
   const providerMap = new Map(providers.map((p) => [p.id, p]));
+  const cache: DiagnosticCache = new Map();
+  const fileVersions: FileVersions = new Map();
+
+  /** Current cwd — set by prewarm or first getDiagnostics call. */
+  let serviceCwd: string | undefined;
+
+  // Initialize cache maps for each provider
+  for (const p of providers) {
+    cache.set(p.id, new Map());
+  }
+
+  /** Get current version for a file, or 0 if never seen. */
+  const getVersion = (absPath: string): number => fileVersions.get(absPath) ?? 0;
+
+  /** Bump version for a file. Returns the new version. */
+  const bumpVersion = (absPath: string): number => {
+    const v = getVersion(absPath) + 1;
+    fileVersions.set(absPath, v);
+    return v;
+  };
+
+  /** Store cached diagnostics if version still matches (not stale). */
+  const cacheStore = (
+    providerId: string,
+    absPath: string,
+    version: number,
+    diagnostics: NormalizedDiagnostic[],
+  ): void => {
+    if (getVersion(absPath) !== version) {
+      log("service", "cache: stale, discarding", { providerId, file: absPath, version });
+      return;
+    }
+    const providerCache = cache.get(providerId);
+    if (!providerCache) return;
+
+    // Delete first so re-insertion moves the key to the end (Map insertion order).
+    // This gives us LRU-by-last-update semantics cheaply.
+    providerCache.delete(absPath);
+    providerCache.set(absPath, { diagnostics, version });
+
+    // Evict oldest entries (first keys in Map iteration order) when over limit
+    if (providerCache.size > MAX_CACHE_ENTRIES_PER_PROVIDER) {
+      const excess = providerCache.size - MAX_CACHE_ENTRIES_PER_PROVIDER;
+      let evicted = 0;
+      for (const key of providerCache.keys()) {
+        if (evicted >= excess) break;
+        providerCache.delete(key);
+        evicted++;
+      }
+      log("service", "cache: evicted LRU entries", { providerId, evicted });
+    }
+  };
+
+  /** Get cached diagnostics if fresh (version matches). */
+  const cacheGet = (providerId: string, absPath: string): NormalizedDiagnostic[] | undefined => {
+    const entry = cache.get(providerId)?.get(absPath);
+    if (!entry) return undefined;
+    if (entry.version !== getVersion(absPath)) return undefined;
+    return entry.diagnostics;
+  };
+
+  // --- In-flight proactive check tracking ---
+  //
+  // When proactiveCheck fires for a file, the promise is tracked here.
+  // If getDiagnostics is called for the same provider+file while the check
+  // is still running, it awaits the existing promise instead of sending a
+  // duplicate request. This prevents double-work — especially important for
+  // ESLint where @typescript-eslint's Program creation is expensive.
+  //
+  // Key: "providerId::absPath"
+  const inFlight = new Map<string, Promise<NormalizedDiagnostic[]>>();
+
+  const inFlightKey = (providerId: string, absPath: string): string => `${providerId}::${absPath}`;
+
+  /**
+   * Run a single provider against a single file and cache the result.
+   * Tracks the promise so getDiagnostics can await it instead of duplicating.
+   */
+  const proactiveCheck = (provider: DiagnosticsProvider, absPath: string, cwd: string): void => {
+    if (!provider.isFileSupported(absPath)) return;
+
+    const key = inFlightKey(provider.id, absPath);
+    if (inFlight.has(key)) {
+      log("service", "proactive check: already in-flight, skipping", {
+        provider: provider.id,
+        file: absPath,
+      });
+      return;
+    }
+
+    const version = getVersion(absPath);
+    log("service", "proactive check: start", { provider: provider.id, file: absPath, version });
+
+    const promise = provider
+      .getDiagnostics({ cwd, files: [absPath] })
+      .then((diagnostics) => {
+        cacheStore(provider.id, absPath, version, diagnostics);
+        log("service", "proactive check: cached", {
+          provider: provider.id,
+          file: absPath,
+          version,
+          count: diagnostics.length,
+        });
+        return diagnostics;
+      })
+      .catch((err) => {
+        log("service", "proactive check: error", {
+          provider: provider.id,
+          file: absPath,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return [] as NormalizedDiagnostic[];
+      })
+      .finally(() => {
+        inFlight.delete(key);
+      });
+
+    inFlight.set(key, promise);
+  };
+
+  // --- Public API ---
 
   const getDiagnostics = async (params: ServiceParams): Promise<GetDiagnosticsResult> => {
     const startTime = Date.now();
-    const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const userTimeoutMs = params.timeoutMs;
     const maxFiles = params.maxFiles ?? DEFAULT_MAX_FILES;
+    serviceCwd ??= params.cwd;
 
     log("service", "getDiagnostics: start", {
       path: params.path,
       cwd: params.cwd,
       providers: params.providers,
-      timeoutMs,
+      userTimeoutMs,
       maxFiles,
     });
 
@@ -156,7 +325,7 @@ export const createDiagnosticsService = (providers: DiagnosticsProvider[]): Diag
       resolveMs: Date.now() - startTime,
     });
 
-    // Run providers in parallel
+    // Run providers in parallel, using cache where available
     const providerStatus: Record<string, ProviderStatus> = {};
 
     const results = await Promise.allSettled(
@@ -172,8 +341,53 @@ export const createDiagnosticsService = (providers: DiagnosticsProvider[]): Diag
           return [];
         }
 
-        log("service", `provider ${provider.id}: starting`, { fileCount: providerFiles.length });
         const providerStart = Date.now();
+        // User-specified timeout wins, then provider's own default, then global default.
+        const timeoutMs = userTimeoutMs ?? provider.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+        // Check cache + in-flight for single-file requests (most common case)
+        if (providerFiles.length === 1 && params.content === undefined) {
+          const absPath = providerFiles[0]!;
+
+          // 1. Cache hit — instant return
+          const cached = cacheGet(provider.id, absPath);
+          if (cached !== undefined) {
+            const ms = Date.now() - providerStart;
+            providerStatus[provider.id] = { status: "ok", timingMs: ms };
+            log("service", `provider ${provider.id}: cache hit`, {
+              file: absPath,
+              ms,
+              count: cached.length,
+            });
+            return cached;
+          }
+
+          // 2. In-flight proactive check — await it instead of duplicating work.
+          //    This is the key optimization: when the agent reads a file, proactiveCheck
+          //    fires ESLint in the background. If getDiagnostics arrives before it
+          //    completes, we piggyback on the existing request instead of sending
+          //    another one that would queue behind it in the serialized worker.
+          const key = inFlightKey(provider.id, absPath);
+          const inFlightPromise = inFlight.get(key);
+          if (inFlightPromise) {
+            log("service", `provider ${provider.id}: awaiting in-flight proactive check`, {
+              file: absPath,
+            });
+            const diagnostics = await pTimeout(inFlightPromise, { milliseconds: timeoutMs });
+            const ms = Date.now() - providerStart;
+            providerStatus[provider.id] = { status: "ok", timingMs: ms };
+            log("service", `provider ${provider.id}: in-flight complete`, {
+              file: absPath,
+              ms,
+              count: diagnostics.length,
+            });
+            return diagnostics;
+          }
+        }
+
+        log("service", `provider ${provider.id}: starting`, {
+          fileCount: providerFiles.length,
+        });
 
         try {
           const diagnostics = await pTimeout(
@@ -192,6 +406,12 @@ export const createDiagnosticsService = (providers: DiagnosticsProvider[]): Diag
             ms: providerMs,
             diagnosticCount: diagnostics.length,
           });
+
+          // Cache results for single-file requests
+          if (providerFiles.length === 1 && params.content === undefined) {
+            cacheStore(provider.id, providerFiles[0]!, getVersion(providerFiles[0]!), diagnostics);
+          }
+
           return diagnostics;
         } catch (err) {
           if (err instanceof TimeoutError) {
@@ -250,15 +470,44 @@ export const createDiagnosticsService = (providers: DiagnosticsProvider[]): Diag
   };
 
   const prewarm = (cwd: string): void => {
-    log("service", "prewarm: delegating to providers", { cwd });
+    serviceCwd = cwd;
+
+    // Prewarm ALL providers so each can load its project/program in the
+    // background. This is separate from proactive checks (syncDocument) —
+    // prewarm is a one-time startup cost, proactive checks are per-edit.
+    const file = findPrewarmFile(cwd);
+    log("service", "prewarm: delegating to all providers", {
+      cwd,
+      file: file ?? "(none)",
+      providers: providers.map((p) => p.id),
+    });
+
+    const options = file ? { file } : undefined;
     for (const provider of providers) {
-      provider.prewarm?.(cwd);
+      provider.prewarm?.(cwd, options);
     }
   };
 
   const syncDocument = (filePath: string, content?: string): void => {
+    const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(serviceCwd ?? "", filePath);
+    const version = bumpVersion(absPath);
+    log("service", "syncDocument", { file: absPath, version, hasContent: content !== undefined });
+
+    // Delegate to providers (open/reload file in tsserver, etc.)
     for (const provider of providers) {
       provider.syncDocument?.(filePath, content);
+    }
+
+    // Proactive background check — fire and forget.
+    // Only providers with proactive !== false get background checks on file
+    // read/edit. Expensive providers (e.g. ESLint with type-aware rules) are
+    // on-demand only to conserve memory — their TS Program only loads when
+    // the agent explicitly requests lint.
+    if (serviceCwd) {
+      for (const provider of providers) {
+        if (provider.proactive === false) continue;
+        proactiveCheck(provider, absPath, serviceCwd);
+      }
     }
   };
 
@@ -267,6 +516,9 @@ export const createDiagnosticsService = (providers: DiagnosticsProvider[]): Diag
     for (const provider of providers) {
       provider.dispose?.();
     }
+    cache.clear();
+    fileVersions.clear();
+    inFlight.clear();
   };
 
   return { getDiagnostics, prewarm, syncDocument, dispose };

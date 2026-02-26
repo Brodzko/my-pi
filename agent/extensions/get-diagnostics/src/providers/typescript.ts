@@ -10,16 +10,24 @@
  * Architecture: we spawn `node tsserver.js` as a child process and communicate
  * via its stdin/stdout protocol (Content-Length framed JSON). No worker thread
  * or fork needed — tsserver IS the isolated process.
+ *
+ * Lifecycle: tsserver is spawned on first use (or prewarm) and stays alive for
+ * the entire session. There is no idle timeout — the session owns the lifecycle
+ * and calls dispose() on shutdown. This mirrors VS Code's model: tsserver loads
+ * the project once at startup, then all subsequent checks are incremental.
+ *
+ * Concurrency: tsserver is single-threaded and only processes one `geterr` at a
+ * time. If a new request arrives while one is in-flight, we queue it and execute
+ * after the current request completes. No work is wasted by cancellation.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
-import * as os from "node:os";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { globSync } from "tinyglobby";
 import type { NormalizedDiagnostic, DiagnosticSeverity } from "../types";
-import type { DiagnosticsProvider, ProviderParams, PrewarmDoneInfo } from "./types";
+import type { DiagnosticsProvider, ProviderParams } from "./types";
 import { log } from "../logger";
+import { findPrewarmFile } from "../prewarm-discovery";
 
 // --- tsserver protocol types ---
 
@@ -59,42 +67,18 @@ const resolveTsServerPath = (
   }
 };
 
-// --- Find a file for prewarm ---
-
-/**
- * Find a TypeScript file to open during prewarm. Any .ts/.tsx file works —
- * tsserver discovers the project from the file's nearest tsconfig.
- *
- * Uses tinyglobby with common monorepo search paths. Stops at first match.
- */
-const findPrewarmFile = (cwd: string): string | undefined => {
-  const results = globSync(["**/*.{ts,tsx}"], {
-    cwd,
-    absolute: true,
-    ignore: [
-      "**/*.d.ts",
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/.next/**",
-      "**/coverage/**",
-      "**/*.test.*",
-      "**/*.spec.*",
-      "**/*e2e*/**",
-      "**/__test*/**",
-    ],
-  });
-  return results[0];
-};
-
 // --- TsServer process wrapper ---
-
-const IDLE_TIMEOUT_MS = 120_000;
 
 const CATEGORY_TO_SEVERITY: Record<string, DiagnosticSeverity> = {
   error: "error",
   warning: "warning",
   suggestion: "hint",
+};
+
+type GetErrQueueEntry = {
+  files: string[];
+  resolve: (diags: Map<string, TsServerDiag[]>) => void;
+  reject: (err: Error) => void;
 };
 
 class TsServer {
@@ -108,7 +92,7 @@ class TsServer {
     { resolve: (body: unknown) => void; reject: (err: Error) => void }
   >();
 
-  // Active geterr state (only one tracked at a time — new requests cancel previous)
+  // Active geterr state (only one tracked at a time)
   private getErrState:
     | {
         requestSeq: number;
@@ -118,11 +102,33 @@ class TsServer {
       }
     | undefined;
 
+  // Queue for getErr requests that arrive while one is in-flight.
+  // tsserver is single-threaded — only one geterr at a time. Instead of
+  // cancelling (wasting work), we queue and execute sequentially.
+  private getErrQueue: GetErrQueueEntry[] = [];
+
   // Prewarm geterr tracking (fire-and-forget, but we track completion)
   private prewarmSeq: number | undefined;
   onPrewarmComplete: (() => void) | undefined;
+  /** Called when the tsserver process dies unexpectedly (error or non-zero exit). */
+  onProcessDeath: ((message: string) => void) | undefined;
 
-  private openFiles = new Set<string>();
+  /**
+   * Resolves when background project loading (prewarm geterr) completes.
+   * Starts resolved (no prewarm pending). `fireGetErr` creates a new pending
+   * promise; `requestCompleted` resolves it. getDiagnostics awaits this so
+   * the first real call benefits from the fully-loaded project instead of
+   * cancelling the prewarm and forcing tsserver to restart checking.
+   */
+  projectReady: Promise<void> = Promise.resolve();
+  private resolveProjectReady: (() => void) | undefined;
+
+  // LRU-ordered open files. Most recently used at the end. When the count
+  // exceeds MAX_OPEN_FILES, the least recently used file is closed. This bounds
+  // tsserver's content buffer memory — the project graph stays loaded regardless,
+  // but each open file holds a source text buffer and priority tracking.
+  private static readonly MAX_OPEN_FILES = 50;
+  private openFiles = new Map<string, number>(); // file → last-access timestamp
   private alive = true;
 
   readonly tsVersion: string;
@@ -149,18 +155,6 @@ class TsServer {
     // Don't keep pi's event loop alive
     this.proc.unref();
 
-    // Lower tsserver's CPU priority so it doesn't starve pi's process.
-    // Priority 19 = lowest on Unix (PRIORITY_LOW). The OS scheduler will
-    // only give tsserver CPU time when pi is idle.
-    if (this.proc.pid) {
-      try {
-        os.setPriority(this.proc.pid, os.constants.priority.PRIORITY_LOW);
-        log("tsserver", "set CPU priority to LOW", { pid: this.proc.pid });
-      } catch {
-        // Might fail on some platforms — non-critical
-      }
-    }
-
     this.proc.stdout!.on("data", (chunk: Buffer) => this.onData(chunk));
     this.proc.stderr!.on("data", (chunk: Buffer) => {
       const text = chunk.toString().trim();
@@ -170,11 +164,18 @@ class TsServer {
       log("tsserver", "process error", { error: err.message });
       this.alive = false;
       this.rejectAll(new Error(`tsserver error: ${err.message}`));
+      this.onProcessDeath?.(`process error: ${err.message}`);
     });
     this.proc.on("exit", (code, signal) => {
       log("tsserver", "process exited", { code, signal });
       this.alive = false;
       this.rejectAll(new Error(`tsserver exited: code=${code} signal=${signal}`));
+      // Only fire onProcessDeath for unexpected exits (not clean shutdown)
+      if (code !== 0 && code !== null) {
+        this.onProcessDeath?.(`exited with code ${code}`);
+      } else if (signal) {
+        this.onProcessDeath?.(`killed by ${signal}`);
+      }
     });
 
     // Wait for configure response to confirm server is ready
@@ -198,68 +199,101 @@ class TsServer {
         this.openFiles.delete(file);
       }
       this.fire("open", { file, fileContent: content });
-      this.openFiles.add(file);
+      this.openFiles.set(file, Date.now());
     } else if (this.openFiles.has(file)) {
-      // Already open: reload from disk
+      // Already open: reload from disk, update access time
       this.fire("reload", { file, tmpfile: file });
+      this.openFiles.set(file, Date.now());
     } else {
       // Not open: open (reads from disk)
       this.fire("open", { file });
-      this.openFiles.add(file);
+      this.openFiles.set(file, Date.now());
+    }
+
+    this.evictLruFiles();
+  }
+
+  /**
+   * Close least-recently-used files when over the limit. Frees tsserver's
+   * content buffers for files not actively being checked. The project graph
+   * stays loaded (tsserver doesn't unload tsconfigs), but each open file
+   * holds source text + priority tracking that adds up.
+   */
+  private evictLruFiles(): void {
+    if (this.openFiles.size <= TsServer.MAX_OPEN_FILES) return;
+
+    // Sort by access time (oldest first), evict until under limit
+    const entries = [...this.openFiles.entries()].sort((a, b) => a[1] - b[1]);
+    const toEvict = entries.slice(0, entries.length - TsServer.MAX_OPEN_FILES);
+
+    for (const [file] of toEvict) {
+      log("tsserver", "evicting LRU file", {
+        file: path.relative(this.cwd, file),
+        openCount: this.openFiles.size,
+      });
+      this.fire("close", { file });
+      this.openFiles.delete(file);
     }
   }
 
   /**
    * Request diagnostics for files. Files must be prepared (opened) first.
-   * Cancels any in-flight geterr (prewarm or previous). tsserver also cancels
-   * the previous geterr internally when it receives a new one.
+   *
+   * If a geterr is already in-flight, the request is queued and executed
+   * after the current one completes. tsserver is single-threaded so only
+   * one geterr can run at a time — queuing avoids cancelling in-flight work.
+   *
+   * Caller should await `projectReady` before calling this so the first real
+   * request benefits from the prewarmed project.
    */
   getErr(files: string[]): Promise<Map<string, TsServerDiag[]>> {
     if (!this.alive) return Promise.reject(new Error("tsserver not alive"));
 
-    // Cancel any in-flight prewarm geterr
+    // Cancel any in-flight prewarm geterr (edge case — caller should have
+    // awaited projectReady, but handle timeout/race gracefully)
     if (this.prewarmSeq !== undefined) {
       log("tsserver", "cancelling prewarm geterr", { prewarmSeq: this.prewarmSeq });
       this.prewarmSeq = undefined;
-      // Don't fire onPrewarmComplete — prewarm was superseded, not completed
+      // Resolve projectReady so any other awaiter unblocks
+      this.resolveProjectReady?.();
+      this.resolveProjectReady = undefined;
       this.onPrewarmComplete = undefined;
     }
 
-    // Cancel any in-flight real geterr
+    // If a real geterr is already in-flight, queue this request
     if (this.getErrState) {
-      log("tsserver", "cancelling in-flight geterr", { oldSeq: this.getErrState.requestSeq });
-      this.getErrState.reject(new Error("cancelled by new geterr"));
-      this.getErrState = undefined;
+      log("tsserver", "getErr: queuing (in-flight request active)", {
+        queueLength: this.getErrQueue.length + 1,
+        files: files.length,
+      });
+      return new Promise((resolve, reject) => {
+        this.getErrQueue.push({ files, resolve, reject });
+      });
     }
 
-    const seq = this.nextSeq();
-    const msg = JSON.stringify({
-      seq,
-      type: "request",
-      command: "geterr",
-      arguments: { files, delay: 0 },
-    });
-
-    return new Promise((resolve, reject) => {
-      const diagnostics = new Map<string, TsServerDiag[]>();
-      for (const f of files) diagnostics.set(f, []);
-
-      this.getErrState = { requestSeq: seq, diagnostics, resolve, reject };
-      this.proc.stdin!.write(msg + "\n");
-    });
+    return this.executeGetErr(files);
   }
 
   /**
    * Fire-and-forget geterr for prewarm. Triggers project load in tsserver
    * but doesn't track diagnostic results — only completion.
+   *
+   * Creates a `projectReady` promise that resolves when the prewarm geterr
+   * completes (requestCompleted event). getDiagnostics awaits this so the
+   * first real call runs against an already-loaded project.
+   *
    * Set `onPrewarmComplete` before calling to get notified when done.
-   * If a real getErr arrives while this is running, tsserver cancels this one
-   * and the partial project load (Program cache) is reused.
    */
   fireGetErr(files: string[]): void {
     if (!this.alive) return;
     const seq = this.nextSeq();
     this.prewarmSeq = seq;
+
+    // Create a new projectReady promise for this prewarm cycle
+    this.projectReady = new Promise<void>((resolve) => {
+      this.resolveProjectReady = resolve;
+    });
+
     const msg = JSON.stringify({
       seq,
       type: "request",
@@ -284,6 +318,14 @@ class TsServer {
     log("tsserver", "shutting down", { pid: this.proc.pid });
     this.alive = false;
     this.openFiles.clear();
+    // Resolve any pending projectReady so awaiters don't hang
+    this.resolveProjectReady?.();
+    this.resolveProjectReady = undefined;
+    // Reject any queued getErr requests
+    for (const entry of this.getErrQueue) {
+      entry.reject(new Error("tsserver shutdown"));
+    }
+    this.getErrQueue = [];
     try {
       this.proc.stdin?.end();
     } catch {
@@ -291,6 +333,43 @@ class TsServer {
     }
     this.proc.kill();
     this.rejectAll(new Error("tsserver shutdown"));
+  }
+
+  // --- Private: getErr execution ---
+
+  private executeGetErr(files: string[]): Promise<Map<string, TsServerDiag[]>> {
+    const seq = this.nextSeq();
+    const msg = JSON.stringify({
+      seq,
+      type: "request",
+      command: "geterr",
+      arguments: { files, delay: 0 },
+    });
+
+    return new Promise((resolve, reject) => {
+      const diagnostics = new Map<string, TsServerDiag[]>();
+      for (const f of files) diagnostics.set(f, []);
+
+      this.getErrState = { requestSeq: seq, diagnostics, resolve, reject };
+      this.proc.stdin!.write(msg + "\n");
+    });
+  }
+
+  /** Process next queued getErr request, if any. */
+  private drainQueue(): void {
+    if (this.getErrQueue.length === 0) return;
+    const next = this.getErrQueue.shift()!;
+    log("tsserver", "drainQueue: executing next", {
+      remaining: this.getErrQueue.length,
+      files: next.files.length,
+    });
+    // Prepare files that might not be open yet
+    for (const f of next.files) {
+      if (!this.openFiles.has(f)) {
+        this.prepareFile(f);
+      }
+    }
+    this.executeGetErr(next.files).then(next.resolve).catch(next.reject);
   }
 
   // --- Private: protocol ---
@@ -401,6 +480,9 @@ class TsServer {
       if (this.prewarmSeq !== undefined && this.prewarmSeq === requestSeq) {
         log("tsserver", "prewarm geterr completed", { seq: requestSeq });
         this.prewarmSeq = undefined;
+        // Resolve projectReady — the project is fully loaded
+        this.resolveProjectReady?.();
+        this.resolveProjectReady = undefined;
         this.onPrewarmComplete?.();
         this.onPrewarmComplete = undefined;
         return;
@@ -411,6 +493,8 @@ class TsServer {
       if (state && state.requestSeq === requestSeq) {
         this.getErrState = undefined;
         state.resolve(state.diagnostics);
+        // Process next queued request
+        this.drainQueue();
       }
     } else if (event === "projectLoadingStart") {
       log("tsserver", "project loading start", { project: body["projectName"] as string });
@@ -429,6 +513,14 @@ class TsServer {
       this.getErrState.reject(err);
       this.getErrState = undefined;
     }
+    // Reject queued requests too
+    for (const entry of this.getErrQueue) {
+      entry.reject(err);
+    }
+    this.getErrQueue = [];
+    // Resolve projectReady so any awaiter unblocks on process death
+    this.resolveProjectReady?.();
+    this.resolveProjectReady = undefined;
   }
 }
 
@@ -436,18 +528,7 @@ class TsServer {
 
 export const createTypescriptProvider = (): DiagnosticsProvider => {
   let server: TsServer | undefined;
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const resetIdleTimer = (): void => {
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      if (server) {
-        log("ts-provider", "idle timeout: shutting down tsserver");
-        server.shutdown();
-        server = undefined;
-      }
-    }, IDLE_TIMEOUT_MS);
-  };
+  let reportedReady = false;
 
   const ensureServer = (cwd: string): TsServer => {
     if (server) return server;
@@ -457,7 +538,16 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
       throw new Error("TypeScript not found. Install typescript in the project.");
     }
 
+    provider.onStatusChange?.({ state: "starting" });
     server = new TsServer(resolved.tsserverPath, cwd, resolved.tsVersion);
+
+    // Track unexpected process death → update status
+    server.onProcessDeath = (message) => {
+      server = undefined;
+      reportedReady = false;
+      provider.onStatusChange?.({ state: "error", detail: message });
+    };
+
     return server;
   };
 
@@ -469,6 +559,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
     supportedExtensions,
     isFileSupported: (filePath: string) => extPattern.test(filePath),
     onPrewarmDone: undefined,
+    onStatusChange: undefined,
 
     async getDiagnostics(params: ProviderParams): Promise<NormalizedDiagnostic[]> {
       const t0 = Date.now();
@@ -480,6 +571,17 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
 
       const srv = ensureServer(params.cwd);
       await srv.ready;
+
+      // Wait for background project loading (prewarm) to complete before
+      // sending our own geterr. If prewarm is done, this resolves immediately.
+      // If prewarm is still running, we wait — the project load is the expensive
+      // part, and our geterr will be fast once it's done. The service-level
+      // pTimeout is the safety net if prewarm takes too long.
+      log("ts-provider", "getDiagnostics: awaiting projectReady");
+      await srv.projectReady;
+      log("ts-provider", "getDiagnostics: projectReady resolved", {
+        waitMs: Date.now() - t0,
+      });
 
       // Prepare files and collect absolute paths
       const absFiles = params.files.map((file) => {
@@ -494,7 +596,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
         return absPath;
       });
 
-      // Request diagnostics
+      // Request diagnostics — queued if another request is in-flight
       const diagMap = await srv.getErr(absFiles);
 
       // Normalize tsserver diagnostics → NormalizedDiagnostic[]
@@ -522,65 +624,88 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
         diagnosticCount: diagnostics.length,
       });
 
-      resetIdleTimer();
+      // Transition to "ready" after first successful check — this covers the
+      // case where prewarm couldn't find a file (status stayed at "warming").
+      if (!reportedReady) {
+        reportedReady = true;
+        provider.onStatusChange?.({ state: "ready", detail: `TS ${srv.tsVersion}` });
+      }
+
       return diagnostics;
     },
 
-    prewarm(cwd: string): void {
-      log("ts-provider", "prewarm: start", { cwd });
+    prewarm(cwd: string, options?: { file?: string }): void {
+      log("ts-provider", "prewarm: start", { cwd, hintFile: options?.file });
       const t0 = Date.now();
 
       const srv = ensureServer(cwd);
+      provider.onStatusChange?.({ state: "warming" });
 
       // Open a file from the project to trigger project load in tsserver.
-      // This happens in the background — tsserver loads the tsconfig, discovers
-      // files, and builds the type graph. When the first real getDiagnostics
-      // call comes in, the project is already loaded.
+      // fireGetErr creates a projectReady promise that resolves when tsserver
+      // finishes loading the project and type-checking the prewarm file.
+      // getDiagnostics awaits projectReady, so the first real call benefits
+      // from the fully-loaded project instead of cancelling the prewarm.
       srv.ready
         .then(() => {
-          const file = findPrewarmFile(cwd);
+          // Use the service-provided file hint if available, otherwise discover
+          const file = options?.file ?? findPrewarmFile(cwd);
           if (!file) {
-            log("ts-provider", "prewarm: no file found to open");
+            log("ts-provider", "prewarm: no TS file found in project");
+            // Stay in "warming" — we couldn't load the project. The first
+            // getDiagnostics call will do the cold load, and we'll transition
+            // to "ready" after it completes (see getDiagnostics path below).
+            // projectReady stays as the resolved default, so getDiagnostics
+            // won't wait (there's nothing to wait for).
             provider.onPrewarmDone?.({
-              success: true,
+              success: false,
               tsVersion: srv.tsVersion,
               timingMs: Date.now() - t0,
-              message: "No entry file found — first call will be cold",
+              message: "No TypeScript file found to prewarm",
             });
             return;
           }
 
-          log("ts-provider", "prewarm: opening file + background geterr", { file });
+          // Open + geterr on ONE file from the most likely project.
+          // geterr triggers the full project load AND Program build for that
+          // file's tsconfig. We prewarm exactly one project — opening files
+          // from multiple packages causes tsserver to load all their tsconfigs
+          // serially (30+ seconds in a monorepo), blocking the geterr.
+          log("ts-provider", "prewarm: opening file + background geterr", {
+            file: path.relative(cwd, file),
+          });
           srv.prepareFile(file);
 
           // Track completion: fire onPrewarmDone when tsserver finishes
-          // loading the project (requestCompleted event), not when we send
-          // the command. If a real getDiagnostics cancels this, prewarm is
-          // superseded and we don't fire onPrewarmDone.
+          // loading the project (requestCompleted event for the prewarm geterr).
           srv.onPrewarmComplete = () => {
             log("ts-provider", "prewarm: project loaded", {
-              file,
+              file: path.relative(cwd, file),
               totalMs: Date.now() - t0,
               tsVersion: srv.tsVersion,
+            });
+            reportedReady = true;
+            provider.onStatusChange?.({
+              state: "ready",
+              detail: `TS ${srv.tsVersion}`,
             });
             provider.onPrewarmDone?.({
               success: true,
               tsVersion: srv.tsVersion,
               timingMs: Date.now() - t0,
             });
-            resetIdleTimer();
           };
 
           srv.fireGetErr([file]);
         })
         .catch((err) => {
-          log("ts-provider", "prewarm: error", {
-            error: err instanceof Error ? err.message : String(err),
-          });
+          const message = err instanceof Error ? err.message : String(err);
+          log("ts-provider", "prewarm: error", { error: message });
+          provider.onStatusChange?.({ state: "error", detail: message });
           provider.onPrewarmDone?.({
             success: false,
             tsVersion: srv.tsVersion,
-            message: err instanceof Error ? err.message : String(err),
+            message,
             timingMs: Date.now() - t0,
           });
         });
@@ -590,24 +715,30 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
       if (!server) return;
       const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(server.cwd, filePath);
 
-      // Close so tsserver picks up fresh content on next check.
-      // For writes with content, re-open with the new content immediately.
-      server.closeFile(absPath);
       if (content !== undefined) {
+        // Edit/write with content: close + reopen with new content so tsserver
+        // sees the updated source immediately.
+        server.closeFile(absPath);
         server.prepareFile(absPath, content);
+      } else {
+        // Read (no content): just ensure the file is open. If already open,
+        // reload from disk to pick up any external changes. Don't close first
+        // — that would discard tsserver's cached type information for the file.
+        server.prepareFile(absPath);
       }
+      // Note: the service layer fires proactiveCheck after syncDocument,
+      // which calls getDiagnostics → geterr. That's the background check.
     },
 
     dispose(): void {
       log("ts-provider", "dispose");
       if (server) {
+        // Clear onProcessDeath before shutdown to avoid spurious error status
+        server.onProcessDeath = undefined;
         server.shutdown();
         server = undefined;
       }
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-        idleTimer = undefined;
-      }
+      provider.onStatusChange?.({ state: "stopped" });
     },
   };
 
