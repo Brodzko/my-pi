@@ -61,7 +61,7 @@ describe('file cache behavior', () => {
     expect(exec).toHaveBeenCalledTimes(1);
   });
 
-  it('awaits a refresh when cache is stale', async () => {
+  it('returns stale cache immediately and refreshes in background', async () => {
     const exec = vi
       .fn()
       .mockResolvedValueOnce(gitOk('src/a.ts\n'))
@@ -74,8 +74,8 @@ describe('file cache behavior', () => {
     vi.setSystemTime(new Date('2026-02-20T12:00:11.000Z'));
     const refreshed = await getFiles('/cwd', pi);
 
-    expect(refreshed.fromCache).toBe(false);
-    expect(refreshed.files).toContain('src/new.ts');
+    expect(refreshed.fromCache).toBe(true);
+    expect(refreshed.files).toContain('src/a.ts');
     expect(exec).toHaveBeenCalledTimes(2);
   });
 

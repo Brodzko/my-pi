@@ -3,7 +3,12 @@ import type {
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
 import { showQuickOpen, type QuickOpenMode } from './src/dialog';
-import { getFiles, prefetchFiles, type FileResult } from './src/files';
+import {
+  getCachedFiles,
+  getFiles,
+  prefetchFiles,
+  type FileResult,
+} from './src/files';
 import { getSessions } from './src/sessions';
 
 const STATUS_KEY = 'quick-open';
@@ -33,20 +38,33 @@ export default function (pi: ExtensionAPI) {
   ): Promise<void> => {
     dialogOpen = true;
     try {
-      const [fileResult, sessions] = await Promise.all([
-        getFiles(ctx.cwd, pi),
+      const cachedFiles = getCachedFiles(ctx.cwd);
+
+      const fileResultPromise = getFiles(ctx.cwd, pi).then(fileResult => {
+        ctx.ui.setStatus(STATUS_KEY, formatFileStatus(fileResult));
+        return fileResult;
+      });
+
+      const sessionPromise = () =>
         getSessions(
           ctx.sessionManager.getSessionDir(),
           ctx.sessionManager.getSessionFile()
-        ),
-      ]);
-
-      ctx.ui.setStatus(STATUS_KEY, formatFileStatus(fileResult));
+        );
 
       const result = await showQuickOpen(
         ctx,
-        fileResult.files,
-        sessions,
+        {
+          files: cachedFiles?.files ?? [],
+          sessions: [],
+        },
+        {
+          files: () => fileResultPromise.then(fileResult => fileResult.files),
+          sessions: sessionPromise,
+        },
+        {
+          files: !cachedFiles,
+          sessions: false,
+        },
         initialMode
       );
       if (!result) return;

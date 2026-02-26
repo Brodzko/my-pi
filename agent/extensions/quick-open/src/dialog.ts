@@ -3,6 +3,7 @@ import {
   CURSOR_MARKER,
   type Focusable,
   matchesKey,
+  type TUI,
   visibleWidth,
 } from '@mariozechner/pi-tui';
 import * as R from 'remeda';
@@ -16,12 +17,24 @@ export type QuickOpenResult =
   | { type: 'session'; id: string; label: string; file: string }
   | null;
 
+export type QuickOpenInitialData = {
+  files: string[];
+  sessions: SessionEntry[];
+};
+
+export type QuickOpenDataLoaders = {
+  files: () => Promise<string[]>;
+  sessions: () => Promise<SessionEntry[]>;
+};
+
+export type QuickOpenLoadingState = {
+  files: boolean;
+  sessions: boolean;
+};
+
 const MAX_VISIBLE = 8;
 const DIALOG_WIDTH = 96;
 
-// ─── module-level pure helpers ────────────────────────────────────────────────
-
-/** Pad or left-truncate `s` to exactly `len` visible characters. */
 const fit = (s: string, len: number): string => {
   const vis = visibleWidth(s);
   if (vis <= len) return s + ' '.repeat(len - vis);
@@ -30,23 +43,17 @@ const fit = (s: string, len: number): string => {
   return '…' + t;
 };
 
-/** Wrap content in border characters, padding to `innerW` visible chars. */
 const makeRow =
   (theme: Theme, innerW: number) =>
   (content: string): string =>
     theme.fg('border', '│') + fit(content, innerW) + theme.fg('border', '│');
 
-/**
- * Left-truncate a result's item and shift its highlight ranges to match,
- * so that colorizing never needs to slice through ANSI escape sequences.
- * For file paths, string length equals visible width, so the slice is safe.
- */
 const truncateResult = (
   result: FuzzyResult,
   maxItemVis: number
 ): FuzzyResult => {
   if (result.item.length <= maxItemVis) return result;
-  const keep = maxItemVis - 1; // 1 char reserved for "…"
+  const keep = maxItemVis - 1;
   const cutAt = result.item.length - keep;
   return {
     item: '…' + result.item.slice(cutAt),
@@ -59,7 +66,6 @@ const truncateResult = (
   };
 };
 
-/** Colorize a result string, marking matched ranges with a different color. */
 const buildHighlighted = (
   result: FuzzyResult,
   isSelected: boolean,
@@ -89,8 +95,6 @@ const buildHighlighted = (
   );
 };
 
-// ─── component ───────────────────────────────────────────────────────────────
-
 class QuickOpenDialog implements Focusable {
   readonly width = DIALOG_WIDTH;
   focused = false;
@@ -102,21 +106,48 @@ class QuickOpenDialog implements Focusable {
   private scrollOffset = 0;
   private results: FuzzyResult[] = [];
 
+  private files: string[];
+  private sessions: SessionEntry[];
+  private filesLoading: boolean;
+  private sessionsLoading: boolean;
+  private sessionsLoaded = false;
+  private filesLoadPromise: Promise<void> | null = null;
+  private sessionsLoadPromise: Promise<void> | null = null;
+
   constructor(
+    private readonly tui: TUI,
     private readonly theme: Theme,
-    private readonly files: string[],
-    private readonly sessions: SessionEntry[],
+    initialData: QuickOpenInitialData,
+    private readonly loaders: QuickOpenDataLoaders,
+    loadingState: QuickOpenLoadingState,
     initialMode: QuickOpenMode,
     private readonly done: (result: QuickOpenResult) => void
   ) {
     this.mode = initialMode;
-    this.results = fuzzySearch('', this.currentItems());
-  }
+    this.files = initialData.files;
+    this.sessions = initialData.sessions;
+    this.filesLoading = loadingState.files;
+    this.sessionsLoading = loadingState.sessions;
+    this.sessionsLoaded =
+      initialData.sessions.length > 0 || loadingState.sessions === true;
 
-  // ── state helpers ──────────────────────────────────────────────────────
+    this.results = fuzzySearch('', this.currentItems());
+
+    if (this.filesLoading) {
+      void this.loadFiles();
+    }
+
+    if (this.mode === 'sessions') {
+      this.ensureSessionsLoaded();
+    }
+  }
 
   private currentItems(): string[] {
     return this.mode === 'files' ? this.files : this.sessions.map(s => s.label);
+  }
+
+  private isCurrentModeLoading(): boolean {
+    return this.mode === 'files' ? this.filesLoading : this.sessionsLoading;
   }
 
   private switchMode(newMode: QuickOpenMode): void {
@@ -126,12 +157,69 @@ class QuickOpenDialog implements Focusable {
     this.selectedIdx = 0;
     this.scrollOffset = 0;
     this.results = fuzzySearch('', this.currentItems());
+
+    if (newMode === 'sessions') {
+      this.ensureSessionsLoaded();
+    }
   }
 
   private requery(): void {
     this.results = fuzzySearch(this.query, this.currentItems());
     this.selectedIdx = 0;
     this.scrollOffset = 0;
+  }
+
+  private requestRender(): void {
+    this.tui.requestRender();
+  }
+
+  private async loadFiles(): Promise<void> {
+    if (this.filesLoadPromise) {
+      await this.filesLoadPromise;
+      return;
+    }
+
+    this.filesLoadPromise = this.loaders
+      .files()
+      .then(files => {
+        this.files = files;
+      })
+      .finally(() => {
+        this.filesLoading = false;
+        this.filesLoadPromise = null;
+        if (this.mode === 'files') {
+          this.requery();
+        }
+        this.requestRender();
+      });
+
+    await this.filesLoadPromise;
+  }
+
+  private ensureSessionsLoaded(): void {
+    if (
+      this.sessionsLoaded ||
+      this.sessionsLoading ||
+      this.sessionsLoadPromise
+    ) {
+      return;
+    }
+
+    this.sessionsLoading = true;
+    this.sessionsLoadPromise = this.loaders
+      .sessions()
+      .then(sessions => {
+        this.sessions = sessions;
+        this.sessionsLoaded = true;
+      })
+      .finally(() => {
+        this.sessionsLoading = false;
+        this.sessionsLoadPromise = null;
+        if (this.mode === 'sessions') {
+          this.requery();
+        }
+        this.requestRender();
+      });
   }
 
   private getVisibleItemSlots(scrollOffset: number): number {
@@ -152,15 +240,12 @@ class QuickOpenDialog implements Focusable {
     }
   }
 
-  // ── query editing helpers ───────────────────────────────────────────
-
   private spliceQuery(from: number, to: number, insert = ''): void {
     this.query = this.query.slice(0, from) + insert + this.query.slice(to);
     this.cursor = from + insert.length;
     this.requery();
   }
 
-  /** Find the position option+backspace should delete to. */
   private wordBoundaryLeft(): number {
     let pos = this.cursor;
     while (pos > 0 && this.query[pos - 1] === ' ') pos--;
@@ -177,13 +262,17 @@ class QuickOpenDialog implements Focusable {
   private resolveSelection(): void {
     const result = this.results[this.selectedIdx];
     if (!result) {
-      this.done(null);
+      if (!this.isCurrentModeLoading()) {
+        this.done(null);
+      }
       return;
     }
+
     if (this.mode === 'files') {
       this.done({ type: 'file', path: result.item });
       return;
     }
+
     const session = this.sessions[result.refIndex];
     this.done(
       session
@@ -203,8 +292,6 @@ class QuickOpenDialog implements Focusable {
     this.selectedIdx = (this.selectedIdx + delta + len) % len;
     this.clampScroll();
   }
-
-  // ── input ──────────────────────────────────────────────────────────────
 
   private readonly keyHandlers: ReadonlyArray<
     readonly [check: (data: string) => boolean, action: () => void]
@@ -235,11 +322,12 @@ class QuickOpenDialog implements Focusable {
           this.spliceQuery(this.cursor - 1, this.cursor);
         } else if (this.mode === 'sessions') {
           this.switchMode('files');
+        } else {
+          this.done(null);
         }
       },
     ],
     [
-      // option+backspace → delete word
       data => data === '\x1b\x7f',
       () => {
         if (this.cursor > 0)
@@ -247,7 +335,6 @@ class QuickOpenDialog implements Focusable {
       },
     ],
     [
-      // cmd+backspace / ctrl+u → delete to start
       data => data === '\x15',
       () => {
         if (this.cursor > 0) this.spliceQuery(0, this.cursor);
@@ -262,7 +349,6 @@ class QuickOpenDialog implements Focusable {
       return;
     }
 
-    // Printable character
     if (data.length === 1 && data.charCodeAt(0) >= 32) {
       if (data === '@' && this.query === '' && this.mode === 'files') {
         this.switchMode('sessions');
@@ -271,8 +357,6 @@ class QuickOpenDialog implements Focusable {
       this.spliceQuery(this.cursor, this.cursor, data);
     }
   }
-
-  // ── render ─────────────────────────────────────────────────────────────
 
   private renderTitle(innerW: number): string {
     const titleText = this.mode === 'files' ? 'Quick Open' : 'Sessions';
@@ -287,8 +371,6 @@ class QuickOpenDialog implements Focusable {
   }
 
   private renderQuery(): string {
-    // In sessions mode, show "@" as a static mode indicator — it's not part
-    // of the search query itself, just a visual anchor matching the "@@" tag.
     const prefix = this.mode === 'sessions' ? this.theme.fg('dim', '@') : '';
     const before = this.query.slice(0, this.cursor);
     const atCursor =
@@ -305,15 +387,23 @@ class QuickOpenDialog implements Focusable {
     const row = makeRow(th, innerW);
 
     if (this.results.length === 0) {
+      const loadingLabel =
+        this.mode === 'files' ? 'loading files…' : 'loading sessions…';
       return [
-        row('  ' + th.fg('dim', 'no matches')),
+        row(
+          '  ' +
+            th.fg(
+              'dim',
+              this.isCurrentModeLoading() ? loadingLabel : 'no matches'
+            )
+        ),
         ...R.times(MAX_VISIBLE - 1, () => row('')),
       ];
     }
 
     const hasMore = this.results.length > this.scrollOffset + MAX_VISIBLE;
     const itemSlots = hasMore ? MAX_VISIBLE - 1 : MAX_VISIBLE;
-    const maxContentVis = innerW - 3; // " ▶ " prefix is 3 visible chars
+    const maxContentVis = innerW - 3;
 
     const itemRows = this.results
       .slice(this.scrollOffset, this.scrollOffset + itemSlots)
@@ -388,17 +478,24 @@ class QuickOpenDialog implements Focusable {
   dispose(): void {}
 }
 
-// ─── public API ──────────────────────────────────────────────────────────────
-
 export const showQuickOpen = (
   ctx: ExtensionContext,
-  files: string[],
-  sessions: SessionEntry[],
+  initialData: QuickOpenInitialData,
+  loaders: QuickOpenDataLoaders,
+  loadingState: QuickOpenLoadingState,
   initialMode: QuickOpenMode
 ): Promise<QuickOpenResult> =>
   ctx.ui.custom<QuickOpenResult>(
-    (_tui, theme, _keybindings, done) =>
-      new QuickOpenDialog(theme, files, sessions, initialMode, done),
+    (tui, theme, _keybindings, done) =>
+      new QuickOpenDialog(
+        tui,
+        theme,
+        initialData,
+        loaders,
+        loadingState,
+        initialMode,
+        done
+      ),
     {
       overlay: true,
       overlayOptions: {
