@@ -27,7 +27,8 @@
       "./session-query/src/index.ts",
       "./session-reference/src/index.ts",
       "./session-name-widget/src/index.ts",
-      "./session-notify/src/index.ts"
+      "./session-notify/src/index.ts",
+      "./session-handoff/src/index.ts"
     ]
   }
 }
