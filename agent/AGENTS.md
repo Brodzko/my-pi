@@ -21,22 +21,23 @@ For major or high-risk tasks (or when review/approval is needed before implement
 2. Propose a short plan (2-5 steps) before making edits.
 3. Ask for review/approval if requested or implied by the task.
 4. Execute incrementally in small, reviewable changes.
-5. Verify: after editing, always run `get_diagnostics` on every touched file for fast, incremental feedback. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
+5. Verify: after editing, always run `get_diagnostics` on every touched file for fast, incremental feedback. **Always run one provider at a time** — default to TypeScript (`providers: ["typescript"]` or omit the param). Only run ESLint (`providers: ["eslint"]`) when explicitly asked for lint checks or as a separate pass. Never pass both providers together. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
 6. Reflect briefly on uncertainty, failed attempts, and what should be reused.
 
 For minor, low-risk tasks, proceed directly without mandatory upfront plan approval.
 
 ## Continuous Learning
 
-Primary memory is **per-project** and must be proactively maintained in the current cwd:
+Primary memory is **per-project** and must be proactively maintained in the **project root** (the repository root where this AGENTS file lives), not in nested package/feature directories:
 
-- Directory: `.brodzko/memory/`
+- Directory: `<project-root>/.brodzko/memory/`
+- Never create `.brodzko/memory/` inside subdirectories (for example `agent/extensions/*/.brodzko/memory`)
 - One memory per file (no giant append-only file)
 - File names must be descriptive and grep-friendly, e.g. `vite-ts-path-alias-resolution.md`
 
 At the start of each task, do targeted retrieval from:
 
-1. Project memory: `.brodzko/memory/**/*.md` (primary)
+1. Project memory: `<project-root>/.brodzko/memory/**/*.md` (primary)
 2. Global memory (fallback):
    - `~/.pi/agent/LEARNINGS.md`
    - `~/.pi/agent/ANTI_PATTERNS.md`
