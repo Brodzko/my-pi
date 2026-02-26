@@ -25,7 +25,6 @@ type FileCache = {
   durationMs: number;
 };
 
-const CACHE_TTL_MS = 10_000;
 const BACKGROUND_REFRESH_INTERVAL_MS = 2_000;
 
 const IGNORED_DIRS = [
@@ -178,10 +177,22 @@ export const prefetchFiles = (cwd: string, pi: ExtensionAPI): void => {
     });
 };
 
+export const getCachedFiles = (cwd: string): FileResult | undefined => {
+  if (cache?.cwd !== cwd) {
+    return undefined;
+  }
+
+  return {
+    files: cache.files,
+    method: cache.method,
+    durationMs: cache.durationMs,
+    fromCache: true,
+  };
+};
+
 /**
  * Return files for `cwd`.
- * - Cache hit & fresh → return immediately (fromCache: true), with periodic background refresh.
- * - Cache hit & stale → await a fresh fetch (fromCache: false).
+ * - Cache hit → return immediately (fromCache: true) and refresh in background.
  * - Cache miss → await a fresh fetch (fromCache: false).
  */
 export const getFiles = async (
@@ -192,22 +203,7 @@ export const getFiles = async (
 
   if (cache?.cwd === cwd) {
     const ageMs = now - cache.fetchedAt;
-    const stale = ageMs > CACHE_TTL_MS;
-
-    if (stale && !cache.refreshing) {
-      cache.refreshing = true;
-      const fresh = await fetchFiles(cwd, pi).catch(() => undefined);
-      if (fresh) {
-        updateCache(cwd, fresh, false);
-        return {
-          files: fresh.files,
-          method: fresh.method,
-          durationMs: fresh.durationMs,
-          fromCache: false,
-        };
-      }
-      if (cache?.cwd === cwd) cache.refreshing = false;
-    } else if (ageMs > BACKGROUND_REFRESH_INTERVAL_MS && !cache.refreshing) {
+    if (ageMs > BACKGROUND_REFRESH_INTERVAL_MS && !cache.refreshing) {
       cache.refreshing = true;
       void refreshCache(cwd, pi);
     }
