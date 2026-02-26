@@ -4,8 +4,10 @@
   "private": true,
   "description": "Compact one-liner tool renderings for pi — read, write, edit, grep, find, ls, bash",
   "scripts": {
+    "format": "node ../../../node_modules/prettier/bin/prettier.cjs --write .",
+    "lint": "tsc --noEmit",
     "tsc": "tsc --noEmit",
-    "format": "prettier --write ."
+    "test": "node --test"
   },
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "^0.52.12",

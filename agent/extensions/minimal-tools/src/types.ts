@@ -15,7 +15,6 @@ export type MinimalToolConfig<TArgs, TDetails> = {
   ) => { preview: string; full: string } | undefined;
   renderResultComponent?: (
     statusLine: string,
-    args: TArgs,
     result: AgentToolResult<TDetails>,
     options: { expanded: boolean; isPartial: boolean },
     theme: Theme

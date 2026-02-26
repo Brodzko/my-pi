@@ -3,22 +3,23 @@ import type { Theme } from '@mariozechner/pi-coding-agent';
 import type { Component } from '@mariozechner/pi-tui';
 import { Text } from '@mariozechner/pi-tui';
 import type { MinimalToolConfig } from './types';
-import { lazyComponent } from './format';
+import { lazyComponent, textContent } from './format';
+
+const EMPTY: Component = { render: () => [], invalidate: () => {} };
 
 export const createMinimalRenderers = <TArgs, TDetails>(
   config: MinimalToolConfig<TArgs, TDetails>
 ) => {
+  // Captured per-call in renderCall, read in renderResult within the same
+  // synchronous updateDisplay cycle. Safe because ToolExecutionComponent
+  // always calls renderCall before renderResult in a single updateDisplay().
   let lastArgs: TArgs | undefined;
-  let completed = false;
 
   return {
     renderCall(args: TArgs, theme: Theme): Component {
       lastArgs = args;
-      completed = false;
-
-      return lazyComponent((spinner) => {
-        if (completed) return '';
-        return `${theme.fg('warning', spinner)} ${config.icon} ${config.target(args, theme)}`;
+      return lazyComponent(indicator => {
+        return `${theme.fg('warning', indicator)} ${config.icon} ${config.target(args, theme)}`;
       });
     },
 
@@ -28,38 +29,54 @@ export const createMinimalRenderers = <TArgs, TDetails>(
       theme: Theme
     ): Component {
       if (options.isPartial) {
-        return new Text(theme.fg('muted', '…'), 0, 0);
+        return EMPTY;
       }
 
-      completed = true;
-      const meta = config.meta?.(result);
+      const capturedArgs = lastArgs;
 
-      const targetStr = lastArgs ? config.target(lastArgs, theme) : '';
-      const metaPart = meta ? ' ' + theme.fg('muted', meta) : '';
-      const statusLine = `${theme.fg('success', '✓')} ${config.icon} ${targetStr}${metaPart}`;
+      const metaText = config.meta?.(result);
+      const statusLine = metaText ? theme.fg('muted', metaText) : undefined;
 
-      if (config.renderResultComponent && lastArgs) {
-        const component = config.renderResultComponent(
-          statusLine,
-          lastArgs,
+      // Custom result component (e.g., ls grid)
+      if (config.renderResultComponent) {
+        const custom = config.renderResultComponent(
+          statusLine ?? '',
           result,
           options,
           theme
         );
-        if (component) return component;
+        if (custom) return custom;
       }
 
-      if (config.body && lastArgs) {
-        const bodyContent = config.body(lastArgs, result, theme);
-        if (bodyContent) {
-          const bodyText = options.expanded
-            ? bodyContent.full
-            : bodyContent.preview;
-          if (bodyText) return new Text(statusLine + '\n\n' + bodyText, 0, 0);
+      // Body content from config
+      const bodyContent =
+        config.body && capturedArgs
+          ? config.body(capturedArgs, result, theme)
+          : undefined;
+
+      if (bodyContent) {
+        const body = options.expanded ? bodyContent.full : bodyContent.preview;
+        if (body && statusLine) return new Text(`${statusLine}\n${body}`, 0, 0);
+        if (body) return new Text(body, 0, 0);
+        if (statusLine) return new Text(statusLine, 0, 0);
+        return EMPTY;
+      }
+
+      // Fallback: show raw output when expanded (tools without body config)
+      if (options.expanded) {
+        const raw = textContent(result).trim();
+        if (raw) {
+          const styled = raw
+            .split('\n')
+            .map(line => theme.fg('toolOutput', line))
+            .join('\n');
+          if (statusLine) return new Text(`${statusLine}\n${styled}`, 0, 0);
+          return new Text(styled, 0, 0);
         }
       }
 
-      return new Text(statusLine, 0, 0);
+      if (statusLine) return new Text(statusLine, 0, 0);
+      return EMPTY;
     },
   };
 };

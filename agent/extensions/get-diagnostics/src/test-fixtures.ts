@@ -24,6 +24,7 @@ export const makeDiagnostic = (
 export const makeResult = (
   overrides: Partial<GetDiagnosticsResult> = {},
 ): GetDiagnosticsResult => ({
+  request: { path: "src/foo.ts" },
   diagnostics: [],
   providerStatus: { typescript: { status: "ok", timingMs: 100 } },
   truncated: false,

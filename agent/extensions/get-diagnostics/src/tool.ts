@@ -77,7 +77,7 @@ export const registerGetDiagnosticsTool = (pi: ExtensionAPI, service: Diagnostic
 
       log("tool", "execute: resolved path", { targetPath, absPath, cwd: ctx.cwd });
 
-      const result = await service.getDiagnostics({
+      const baseResult = await service.getDiagnostics({
         cwd: ctx.cwd,
         path: absPath,
         content: params.content,
@@ -85,6 +85,14 @@ export const registerGetDiagnosticsTool = (pi: ExtensionAPI, service: Diagnostic
         timeoutMs: params.timeoutMs,
         maxFiles: params.maxFiles,
       });
+
+      const result: GetDiagnosticsResult = {
+        ...baseResult,
+        request: {
+          path: targetPath,
+          providers: params.providers,
+        },
+      };
 
       const text = formatDiagnosticsResult(result);
 
@@ -104,6 +112,6 @@ export const registerGetDiagnosticsTool = (pi: ExtensionAPI, service: Diagnostic
       renderCall(args as { path: string; content?: string; providers?: string[] }, theme),
 
     renderResult: (result, options, theme) =>
-      renderResult(result as { details: GetDiagnosticsResult | undefined }, options, theme),
+      renderResult(result as AgentToolResult<GetDiagnosticsResult>, options, theme),
   });
 };

@@ -5,15 +5,15 @@ import { formatSize } from '@mariozechner/pi-coding-agent';
 import type { Component } from '@mariozechner/pi-tui';
 import { truncateToWidth } from '@mariozechner/pi-tui';
 
-// ── Spinner ───────────────────────────────────────────────────────────────
+// ── Pending indicator ─────────────────────────────────────────────────────
 
-const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
-const SPINNER_INTERVAL_MS = 80;
+const PENDING_INDICATOR = '⋯';
 
-export const lazyComponent = (buildLine: (spinner: string) => string): Component => ({
-  render: (width) => {
-    const frame = Math.floor(Date.now() / SPINNER_INTERVAL_MS) % SPINNER_FRAMES.length;
-    const line = buildLine(SPINNER_FRAMES[frame]);
+export const lazyComponent = (
+  buildLine: (indicator: string) => string
+): Component => ({
+  render: width => {
+    const line = buildLine(PENDING_INDICATOR);
     if (!line) return [];
     return [truncateToWidth(line, width)];
   },
@@ -36,7 +36,7 @@ export const basename = (path: string | undefined) =>
 export const textContent = (result: AgentToolResult<unknown>): string =>
   result.content
     .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
-    .map((c) => c.text)
+    .map(c => c.text)
     .join('\n');
 
 export const truncationMeta = (
@@ -66,7 +66,7 @@ export const previewLines = (
 export const colorizeDiff = (diff: string, theme: Theme): string =>
   diff
     .split('\n')
-    .map((line) => {
+    .map(line => {
       if (line.startsWith('+')) return theme.fg('toolDiffAdded', line);
       if (line.startsWith('-')) return theme.fg('toolDiffRemoved', line);
       if (line.startsWith('@')) return theme.fg('muted', line);
@@ -82,7 +82,7 @@ export const expandOnlyBody = (
   if (!output) return undefined;
   const full = output
     .split('\n')
-    .map((line) => theme.fg('toolOutput', line))
+    .map(line => theme.fg('toolOutput', line))
     .join('\n');
   return { preview: '', full };
 };

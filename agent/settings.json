@@ -11,11 +11,10 @@
     "anthropic/claude-sonnet-4-6"
   ],
   "hideThinkingBlock": true,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "extensions": [
     "~/rossum/coding-agents/pi/extensions",
-    "./extensions/sessions",
-    "!./extensions/get-diagnostics/index.ts"
+    "./extensions/sessions"
   ],
   "skills": [
     "~/rossum/coding-agents/pi/skills",

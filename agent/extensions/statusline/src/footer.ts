@@ -18,9 +18,12 @@ type FooterDeps = {
   getEditor: () => StatuslineEditor | null;
   ctx: ExtensionContext;
   buildEditorInfo: (ctx: ExtensionContext) => EditorInfo;
+  isTurnOngoing: () => boolean;
 };
 
 const subscriptionRefreshMs = 60_000;
+const TURN_SPINNER_INTERVAL_MS = 100;
+const TURN_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
 
 export const createFooter = (
   tui: TUI,
@@ -39,6 +42,25 @@ export const createFooter = (
   let lastSubscriptionFetchAt = 0;
   let isSubscriptionLoading = false;
   let lastActiveUsageProvider: ProviderId | null = null;
+  let turnSpinnerTimer: ReturnType<typeof setInterval> | null = null;
+
+  const stopTurnSpinner = () => {
+    if (!turnSpinnerTimer) return;
+    clearInterval(turnSpinnerTimer);
+    turnSpinnerTimer = null;
+  };
+
+  const ensureTurnSpinner = () => {
+    if (!deps.isTurnOngoing()) {
+      stopTurnSpinner();
+      return;
+    }
+
+    if (turnSpinnerTimer) return;
+    turnSpinnerTimer = setInterval(() => {
+      tui.requestRender();
+    }, TURN_SPINNER_INTERVAL_MS);
+  };
 
   const refreshSubscriptionSummary = async () => {
     if (isSubscriptionLoading) return;
@@ -69,7 +91,10 @@ export const createFooter = (
   void refreshSubscriptionSummary();
 
   return {
-    dispose: unsub,
+    dispose: () => {
+      stopTurnSpinner();
+      unsub();
+    },
     invalidate() {},
     render(width: number): string[] {
       const info = deps.buildEditorInfo(deps.ctx);
@@ -99,12 +124,23 @@ export const createFooter = (
         void refreshSubscriptionSummary();
       }
 
+      ensureTurnSpinner();
+
       const usage = deps.ctx.getContextUsage();
       const statuses = renderStatuses(footerData.getExtensionStatuses(), theme);
+      const turnSpinner = deps.isTurnOngoing()
+        ? theme.fg(
+            'warning',
+            TURN_SPINNER_FRAMES[
+              Math.floor(Date.now() / TURN_SPINNER_INTERVAL_MS) %
+                TURN_SPINNER_FRAMES.length
+            ]
+          )
+        : '';
       const primaryLine =
         !usage || usage.percent === null
-          ? renderNoUsage(statuses, theme, width)
-          : renderWithUsage(usage, statuses, theme, width);
+          ? renderNoUsage(statuses, turnSpinner, theme, width)
+          : renderWithUsage(usage, statuses, turnSpinner, theme, width);
 
       return [
         primaryLine,
@@ -122,12 +158,18 @@ const renderStatuses = (
     .map(text => theme.fg('dim', text))
     .join(theme.fg('dim', ' │ '));
 
-const renderNoUsage = (statusStr: string, theme: ThemeFg, width: number): string => {
+const renderNoUsage = (
+  statusStr: string,
+  turnSpinner: string,
+  theme: ThemeFg,
+  width: number
+): string => {
   const left = theme.fg('dim', 'Ready');
-  if (!statusStr) return truncateToWidth(left, width);
+  const right = [statusStr, turnSpinner].filter(Boolean).join(' ');
+  if (!right) return truncateToWidth(left, width);
 
-  const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(statusStr));
-  return truncateToWidth(`${left}${' '.repeat(gap)}${statusStr}`, width);
+  const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
+  return truncateToWidth(`${left}${' '.repeat(gap)}${right}`, width);
 };
 
 const renderWithUsage = (
@@ -137,6 +179,7 @@ const renderWithUsage = (
     percent: number | null;
   },
   statusStr: string,
+  turnSpinner: string,
   theme: ThemeFg,
   width: number
 ): string => {
@@ -145,8 +188,9 @@ const renderWithUsage = (
   const label = theme.fg('dim', ` ${percent}%/${formatTokens(usage.contextWindow)}`);
   const left = `${bar}${label}`;
 
-  if (!statusStr) return truncateToWidth(left, width);
+  const right = [statusStr, turnSpinner].filter(Boolean).join(' ');
+  if (!right) return truncateToWidth(left, width);
 
-  const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(statusStr));
-  return truncateToWidth(`${left}${' '.repeat(gap)}${statusStr}`, width);
+  const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
+  return truncateToWidth(`${left}${' '.repeat(gap)}${right}`, width);
 };

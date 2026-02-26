@@ -21,7 +21,7 @@ For major or high-risk tasks (or when review/approval is needed before implement
 2. Propose a short plan (2-5 steps) before making edits.
 3. Ask for review/approval if requested or implied by the task.
 4. Execute incrementally in small, reviewable changes.
-5. Verify: after editing, always run `get_diagnostics` on every touched file for fast, incremental feedback. **Always run one provider at a time** — default to TypeScript (`providers: ["typescript"]` or omit the param). Only run ESLint (`providers: ["eslint"]`) when explicitly asked for lint checks or as a separate pass. Never pass both providers together. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
+5. Verify: after each meaningful edit, run `get_diagnostics` on every touched file for immediate feedback, then actively address diagnostics before moving on. Treat diagnostics as blocking unless they are explicitly accepted as out-of-scope by the user. **Always run one provider at a time** — default to TypeScript (`providers: ["typescript"]` or omit the param). Run ESLint (`providers: ["eslint"]`) as a separate pass when lint feedback is requested/expected; if ESLint reports issues in changed code, attempt fixes before continuing. Never pass both providers together. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
 6. Reflect briefly on uncertainty, failed attempts, and what should be reused.
 
 For minor, low-risk tasks, proceed directly without mandatory upfront plan approval.
@@ -200,7 +200,7 @@ If verification fails:
 
 - [ ] Goal implemented as requested
 - [ ] Scope respected (no unrelated refactors)
-- [ ] `get_diagnostics` run on all touched files (final pass)
+- [ ] `get_diagnostics` run on all touched files (final pass), and reported diagnostics in changed scope are fixed or explicitly called out/accepted
 - [ ] Relevant tests run, or explicitly called out as not run
 - [ ] Risks, assumptions, and follow-ups stated clearly
 - [ ] Reusable lesson captured in `.brodzko/memory/` (project) when applicable; promote to `~/.pi/agent/LEARNINGS.md` only if cross-project
