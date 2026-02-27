@@ -1,6 +1,7 @@
 {
   "sessionMemory": "command",
   "rules": [
+    { "matches": "*glab*", "action": "reject" },
     {
       "matches": ["*rm -rf /*", "*rm -rf ~*", "*rm -rf .*"],
       "action": "reject"
