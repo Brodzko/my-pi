@@ -1,0 +1,26 @@
+{
+  "name": "pi-choose-options",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "prettier --check .",
+    "tsc": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "0.52.12",
+    "@types/node": "20.19.33",
+    "prettier": "3.5.3",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "0.34.48"
+  }
+}
