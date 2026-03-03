@@ -3,7 +3,8 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
-import type { Usage } from '@mariozechner/pi-ai';
+import type { Api, Model, Usage } from '@mariozechner/pi-ai';
+import { readFile } from 'node:fs/promises';
 import {
   formatUsdCost,
   notifyInvalidConfig,
@@ -19,6 +20,23 @@ import { composeHandoffPrefill } from './message';
 
 const sessionHandoffConfig = sessionHandoffConfigLoadResult.config;
 const statusController = createStatusController(sessionHandoffConfig);
+
+type SettingsFile = {
+  enabledModels?: string[];
+};
+
+const settingsJsonPath = new URL('../../../../settings.json', import.meta.url);
+
+const loadEnabledModelPatterns = async (): Promise<string[] | undefined> => {
+  try {
+    const raw = await readFile(settingsJsonPath, 'utf8');
+    const parsed = JSON.parse(raw) as SettingsFile;
+
+    return parsed.enabledModels;
+  } catch {
+    return undefined;
+  }
+};
 
 type HandoffTelemetryEntry = {
   success: boolean;
@@ -53,7 +71,7 @@ const createState = (): HandoffState => ({
 const notifyInvalidConfigOnce = (
   ctx: ExtensionContext,
   state: HandoffState
-) => {
+): void => {
   if (state.warnedInvalidConfig) {
     return;
   }
@@ -95,11 +113,166 @@ const checkModelAvailability = async (
   });
 };
 
+const isTextModel = (model: Model<Api>): boolean =>
+  model.input.includes('text');
+
+type SelectableTargetModel = {
+  label: string;
+  model: Model<Api>;
+};
+
+const THINKING_LEVEL_SUFFIX = ['off', 'low', 'medium', 'high', 'max'] as const;
+
+const stripThinkingLevelSuffix = (pattern: string): string => {
+  const parts = pattern.split(':');
+  if (parts.length < 2) {
+    return pattern;
+  }
+
+  const suffix = parts.at(-1)?.toLowerCase();
+  const hasThinkingLevelSuffix = THINKING_LEVEL_SUFFIX.some(
+    level => level === suffix
+  );
+
+  if (!suffix || !hasThinkingLevelSuffix) {
+    return pattern;
+  }
+
+  return parts.slice(0, -1).join(':');
+};
+
+const toGlobRegex = (pattern: string): RegExp => {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regexSource = `^${escaped.replace(/\*/g, '.*')}$`;
+
+  return new RegExp(regexSource, 'i');
+};
+
+const matchesModelPattern = (
+  model: Model<Api>,
+  rawPattern: string
+): boolean => {
+  const pattern = stripThinkingLevelSuffix(rawPattern).trim();
+  if (!pattern) {
+    return false;
+  }
+
+  const providerAndId = `${model.provider}/${model.id}`;
+  const hasWildcard = pattern.includes('*');
+
+  if (hasWildcard) {
+    const patternRegex = toGlobRegex(pattern);
+
+    return (
+      patternRegex.test(providerAndId) ||
+      patternRegex.test(model.id) ||
+      patternRegex.test(model.name)
+    );
+  }
+
+  const normalizedPattern = pattern.toLowerCase();
+
+  return (
+    providerAndId.toLowerCase() === normalizedPattern ||
+    model.id.toLowerCase() === normalizedPattern ||
+    model.name.toLowerCase().includes(normalizedPattern)
+  );
+};
+
+const resolveScopedModelsFromPatterns = (
+  models: Model<Api>[],
+  patterns: string[]
+): Model<Api>[] => {
+  const scopedModels: Model<Api>[] = [];
+
+  for (const pattern of patterns) {
+    const matchingModels = models.filter(model =>
+      matchesModelPattern(model, pattern)
+    );
+
+    for (const model of matchingModels) {
+      const alreadyIncluded = scopedModels.some(
+        scopedModel =>
+          scopedModel.provider === model.provider && scopedModel.id === model.id
+      );
+
+      if (!alreadyIncluded) {
+        scopedModels.push(model);
+      }
+    }
+  }
+
+  return scopedModels;
+};
+
+const getSelectableTargetModels = async (
+  ctx: ExtensionCommandContext
+): Promise<SelectableTargetModel[]> => {
+  const availableModels = ctx.modelRegistry.getAvailable();
+  const enabledPatterns = await loadEnabledModelPatterns();
+
+  const models =
+    enabledPatterns && enabledPatterns.length > 0
+      ? resolveScopedModelsFromPatterns(availableModels, enabledPatterns)
+      : availableModels;
+
+  return models.filter(isTextModel).map(model => ({
+    label: `${model.provider}/${model.id}`,
+    model,
+  }));
+};
+
+const chooseTargetSessionModel = async (
+  ctx: ExtensionCommandContext
+): Promise<Model<Api> | undefined> => {
+  const selectableModels = await getSelectableTargetModels(ctx);
+  if (selectableModels.length === 0) {
+    return undefined;
+  }
+
+  if (!ctx.hasUI || selectableModels.length === 1) {
+    return ctx.model ?? selectableModels[0]?.model;
+  }
+
+  const selectedLabel = await ctx.ui.select(
+    'Choose model for new session',
+    selectableModels.map(model => model.label)
+  );
+
+  if (!selectedLabel) {
+    statusController.setStatus(ctx, 'error', '❌ handoff cancelled', true);
+    return undefined;
+  }
+
+  return selectableModels.find(model => model.label === selectedLabel)?.model;
+};
+
+const collectOptionalInstruction = async (
+  ctx: ExtensionCommandContext,
+  initialInstruction: string
+): Promise<string | undefined> => {
+  if (!ctx.hasUI) {
+    return initialInstruction;
+  }
+
+  const instruction = await ctx.ui.editor(
+    'Additional handoff instructions (optional)',
+    initialInstruction
+  );
+
+  if (instruction === undefined) {
+    statusController.setStatus(ctx, 'error', '❌ handoff cancelled', true);
+    return undefined;
+  }
+
+  return instruction;
+};
+
 const runHandoff = async (
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
   state: HandoffState,
-  optionalInstruction: string
+  initialInstruction: string
 ): Promise<void> => {
   if (!sessionHandoffConfigLoadResult.valid) {
     notifyInvalidConfigOnce(ctx, state);
@@ -141,6 +314,26 @@ const runHandoff = async (
       true
     );
 
+    return;
+  }
+
+  const targetSessionModel = await chooseTargetSessionModel(ctx);
+  if (!targetSessionModel) {
+    statusController.setStatus(
+      ctx,
+      'error',
+      '❌ handoff failed: no selectable text model available',
+      true
+    );
+
+    return;
+  }
+
+  const optionalInstruction = await collectOptionalInstruction(
+    ctx,
+    initialInstruction
+  );
+  if (optionalInstruction === undefined) {
     return;
   }
 
@@ -192,6 +385,14 @@ const runHandoff = async (
     if (newSessionResult.cancelled) {
       statusController.setStatus(ctx, 'error', '❌ handoff cancelled', true);
       return;
+    }
+
+    const modelSet = await pi.setModel(targetSessionModel);
+    if (!modelSet) {
+      ctx.ui.notify(
+        `Could not activate ${targetSessionModel.provider}/${targetSessionModel.id} in new session`,
+        'warning'
+      );
     }
 
     ctx.ui.setEditorText(prefill);
