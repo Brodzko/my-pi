@@ -14,14 +14,17 @@ Execution flow:
 
 1. Serialize current session branch conversation (user/assistant text only).
 2. Derive touched file hints from assistant tool calls (`path`, `paths`, `file`, `files` args).
-3. Generate structured handoff markdown with sections:
+3. Open an intermediate UI flow:
+   - target-session model picker (single-select) using current scoped model patterns (`enabledModels`/`/scoped-models`) when present, otherwise all available text/chat models,
+   - instruction editor (prefilled with command args) for optional extra guidance.
+4. Generate structured handoff markdown with sections:
    - `## Goal`
    - `## Progress`
    - `## Hurdles`
    - `## Touched Files`
    - `## Next Steps`
-4. Start a new session (`newSession`) with parent linkage to the previous session when available.
-5. Prefill the new session editor with:
+5. Start a new session (`newSession`) with parent linkage to the previous session when available.
+6. Prefill the new session editor with:
    - generated handoff markdown,
    - explicit guidance to use `query_session` for deeper context,
    - appended optional instruction (if provided).
