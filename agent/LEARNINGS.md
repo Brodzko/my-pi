@@ -76,3 +76,13 @@ Prefer concise entries with explicit triggers.
 - Rule (future behavior change): When two features parse the same session file contract, centralize extraction into one parser with option flags (e.g. text length limits) and reuse it from both callsites.
 - Trigger (when this applies): Any new consumer of session JSONL/NDJSON metadata (id/name/first-user-text).
 - Example file/commit: agent/extensions/sessions/shared/session-file-label.ts
+
+- ID: LRN-20260303-01
+- Level: L1 (policy)
+- Tags: [repo-setup, dependencies, gitignore, remeda, functional-style]
+- Date: 2026-03-03
+- Context: User set permanent coding standards while bootstrapping a new CLI repository.
+- Signal (what failed or what worked): Initial scaffold used semver ranges and lacked committed `.gitignore`; utility/transformation logic also drifted from requested functional style.
+- Rule (future behavior change): Default to exact dependency versions (no `^`/`~`), always add `.gitignore` in new repos, and prefer Remeda + immutable/composable transformations when touching utility-heavy logic.
+- Trigger (when this applies): Any new project scaffold or refactor affecting dependency manifests and transformation helpers.
+- Example file/commit: quill/package.json, quill/.gitignore, quill/src/cli.ts
