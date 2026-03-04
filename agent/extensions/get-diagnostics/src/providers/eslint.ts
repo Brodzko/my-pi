@@ -14,14 +14,14 @@
  * (no background checks on every file edit), the server loads eagerly so
  * the first explicit ESLint request is fast.
  */
-import * as path from "node:path";
-import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
-import * as R from "remeda";
-import type { NormalizedDiagnostic, DiagnosticSeverity } from "../types";
-import type { DiagnosticsProvider, ProviderParams } from "./types";
-import { log } from "../logger";
-import { createSyncQueue } from "./eslint-sync-queue";
+import * as path from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
+import * as R from 'remeda';
+import type { NormalizedDiagnostic, DiagnosticSeverity } from '../types';
+import type { DiagnosticsProvider, ProviderParams } from './types';
+import { log } from '../logger';
+import { createSyncQueue } from './eslint-sync-queue';
 
 // --- Types ---
 
@@ -48,22 +48,25 @@ type ServerResponse =
 // --- Result normalization ---
 
 const SEVERITY_MAP: Record<number, DiagnosticSeverity> = {
-  1: "warning",
-  2: "error",
+  1: 'warning',
+  2: 'error',
 };
 
-const normalizeResults = (results: ESLintLintResult[], cwd: string): NormalizedDiagnostic[] =>
+const normalizeResults = (
+  results: ESLintLintResult[],
+  cwd: string
+): NormalizedDiagnostic[] =>
   R.pipe(
     results,
-    R.flatMap((result) =>
+    R.flatMap(result =>
       result.messages.map(
         (msg): NormalizedDiagnostic => ({
-          provider: "eslint",
+          provider: 'eslint',
           path: path.relative(cwd, result.filePath),
-          severity: SEVERITY_MAP[msg.severity] ?? "warning",
+          severity: SEVERITY_MAP[msg.severity] ?? 'warning',
           message: msg.message,
           code: msg.ruleId ?? undefined,
-          source: "eslint",
+          source: 'eslint',
           range: {
             start: {
               line: Math.max(0, msg.line - 1),
@@ -74,23 +77,23 @@ const normalizeResults = (results: ESLintLintResult[], cwd: string): NormalizedD
               character: Math.max(0, (msg.endColumn ?? msg.column) - 1),
             },
           },
-        }),
-      ),
-    ),
+        })
+      )
+    )
   );
 
 const makeErrorDiagnostic = (message: string): NormalizedDiagnostic => ({
-  provider: "eslint",
-  path: "",
-  severity: "error",
+  provider: 'eslint',
+  path: '',
+  severity: 'error',
   message,
   range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
 });
 
 const makeInfoDiagnostic = (message: string): NormalizedDiagnostic => ({
-  provider: "eslint",
-  path: "",
-  severity: "info",
+  provider: 'eslint',
+  path: '',
+  severity: 'info',
   message,
   range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
 });
@@ -118,7 +121,10 @@ export const createEslintProvider = (): DiagnosticsProvider => {
   // before the first lint request.
   const syncQueue = createSyncQueue();
 
-  const serverPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "eslint-server.ts");
+  const serverPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'eslint-server.ts'
+  );
 
   let initialized = false;
   let initPromise: Promise<void> | undefined;
@@ -129,7 +135,7 @@ export const createEslintProvider = (): DiagnosticsProvider => {
   const ensureWorker = (): Worker => {
     if (worker) return worker;
 
-    log("eslint-provider", "spawning worker", { serverPath });
+    log('eslint-provider', 'spawning worker', { serverPath });
     const w = new Worker(serverPath, {
       // pi runs .ts via a loader — the worker needs the same treatment.
       execArgv: process.execArgv,
@@ -142,14 +148,19 @@ export const createEslintProvider = (): DiagnosticsProvider => {
 
     w.unref(); // Don't keep pi alive
 
-    w.on("message", (msg: ServerResponse) => {
+    w.on('message', (msg: ServerResponse) => {
       // Events (unsolicited server → client)
-      if ("event" in msg) {
-        if (msg.event === "status") {
+      if ('event' in msg) {
+        if (msg.event === 'status') {
           const body = msg.body as { state: string; detail?: string };
-          log("eslint-provider", "status event", body);
+          log('eslint-provider', 'status event', body);
           provider.onStatusChange?.({
-            state: body.state as "starting" | "warming" | "ready" | "error" | "stopped",
+            state: body.state as
+              | 'starting'
+              | 'warming'
+              | 'ready'
+              | 'error'
+              | 'stopped',
             detail: body.detail,
           });
         }
@@ -168,9 +179,9 @@ export const createEslintProvider = (): DiagnosticsProvider => {
       }
     });
 
-    w.on("error", (err) => {
-      log("eslint-provider", "worker error", { error: err.message });
-      provider.onStatusChange?.({ state: "error", detail: err.message });
+    w.on('error', err => {
+      log('eslint-provider', 'worker error', { error: err.message });
+      provider.onStatusChange?.({ state: 'error', detail: err.message });
       for (const [, cb] of pending) {
         cb.reject(err);
       }
@@ -180,10 +191,13 @@ export const createEslintProvider = (): DiagnosticsProvider => {
       initPromise = undefined;
     });
 
-    w.on("exit", (code) => {
-      log("eslint-provider", "worker exited", { code });
+    w.on('exit', code => {
+      log('eslint-provider', 'worker exited', { code });
       if (code !== 0) {
-        provider.onStatusChange?.({ state: "error", detail: `Worker exited with code ${code}` });
+        provider.onStatusChange?.({
+          state: 'error',
+          detail: `Worker exited with code ${code}`,
+        });
       }
       for (const [, cb] of pending) {
         cb.reject(new Error(`ESLint worker exited with code ${code}`));
@@ -201,17 +215,20 @@ export const createEslintProvider = (): DiagnosticsProvider => {
 
   // --- Communication ---
 
-  const sendNotification = (command: string, args: Record<string, unknown>): void => {
+  const sendNotification = (
+    command: string,
+    args: Record<string, unknown>
+  ): void => {
     worker?.postMessage({ command, arguments: args });
   };
 
   const sendRequest = (
     command: string,
-    args: Record<string, unknown>,
+    args: Record<string, unknown>
   ): Promise<Record<string, unknown>> =>
     new Promise((resolve, reject) => {
       if (!worker) {
-        reject(new Error("ESLint worker not running"));
+        reject(new Error('ESLint worker not running'));
         return;
       }
       const id = seq++;
@@ -229,12 +246,12 @@ export const createEslintProvider = (): DiagnosticsProvider => {
         entry.command,
         entry.content !== undefined
           ? { file: entry.file, content: entry.content }
-          : { file: entry.file },
+          : { file: entry.file }
       );
       openFiles.add(entry.file);
     }
     if (entries.length > 0) {
-      log("eslint-provider", "replayed sync queue", { count: entries.length });
+      log('eslint-provider', 'replayed sync queue', { count: entries.length });
     }
   };
 
@@ -245,8 +262,8 @@ export const createEslintProvider = (): DiagnosticsProvider => {
     initPromise = (async () => {
       ensureWorker();
       serverCwd = cwd;
-      provider.onStatusChange?.({ state: "starting" });
-      await sendRequest("initialize", { cwd });
+      provider.onStatusChange?.({ state: 'starting' });
+      await sendRequest('initialize', { cwd });
       initialized = true;
       replaySyncQueue();
       initPromise = undefined;
@@ -257,18 +274,29 @@ export const createEslintProvider = (): DiagnosticsProvider => {
 
   // --- Provider implementation ---
 
-  const supportedExtensions = ["ts", "tsx", "js", "jsx", "mts", "cts", "mjs", "cjs"] as const;
-  const extPattern = new RegExp(`\\.(${supportedExtensions.join("|")})$`);
+  const supportedExtensions = [
+    'ts',
+    'tsx',
+    'js',
+    'jsx',
+    'mts',
+    'cts',
+    'mjs',
+    'cjs',
+  ] as const;
+  const extPattern = new RegExp(`\\.(${supportedExtensions.join('|')})$`);
 
   const provider: DiagnosticsProvider = {
-    id: "eslint",
+    id: 'eslint',
     supportedExtensions,
     defaultTimeoutMs: 120_000,
     proactive: false,
     isFileSupported: (filePath: string) => extPattern.test(filePath),
     onStatusChange: undefined,
 
-    async getDiagnostics(params: ProviderParams): Promise<NormalizedDiagnostic[]> {
+    async getDiagnostics(
+      params: ProviderParams
+    ): Promise<NormalizedDiagnostic[]> {
       try {
         await ensureInitialized(params.cwd);
 
@@ -276,20 +304,29 @@ export const createEslintProvider = (): DiagnosticsProvider => {
           // Single file: use lint command → lintText with tracked content.
           // This is the fast path — no disk I/O, incremental program update.
           const file = params.contentPath ?? params.files[0];
-          const body = await sendRequest("lint", {
+          const body = await sendRequest('lint', {
             file,
-            ...(params.content !== undefined ? { content: params.content } : {}),
+            ...(params.content !== undefined
+              ? { content: params.content }
+              : {}),
           });
-          return normalizeResults(body.results as ESLintLintResult[], params.cwd);
+          return normalizeResults(
+            body.results as ESLintLintResult[],
+            params.cwd
+          );
         }
 
         // Multi-file (directory scan): use lintFiles for ESLint's batch mode.
-        const body = await sendRequest("lintFiles", { files: params.files });
+        const body = await sendRequest('lintFiles', { files: params.files });
         return normalizeResults(body.results as ESLintLintResult[], params.cwd);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        if (message === "ESLint not found in project") {
-          return [makeInfoDiagnostic("ESLint not found in project. Install with: npm i -D eslint")];
+        if (message === 'ESLint not found in project') {
+          return [
+            makeInfoDiagnostic(
+              'ESLint not found in project. Install with: npm i -D eslint'
+            ),
+          ];
         }
         return [makeErrorDiagnostic(`ESLint error: ${message}`)];
       }
@@ -303,33 +340,40 @@ export const createEslintProvider = (): DiagnosticsProvider => {
 
       if (openFiles.has(filePath)) {
         sendNotification(
-          "change",
-          content !== undefined ? { file: filePath, content } : { file: filePath },
+          'change',
+          content !== undefined
+            ? { file: filePath, content }
+            : { file: filePath }
         );
       } else {
         sendNotification(
-          "open",
-          content !== undefined ? { file: filePath, content } : { file: filePath },
+          'open',
+          content !== undefined
+            ? { file: filePath, content }
+            : { file: filePath }
         );
         openFiles.add(filePath);
       }
     },
 
     prewarm(cwd: string, options?: { file?: string }): void {
-      log("eslint-provider", "prewarm: start", { cwd, hintFile: options?.file });
-      provider.onStatusChange?.({ state: "warming" });
+      log('eslint-provider', 'prewarm: start', {
+        cwd,
+        hintFile: options?.file,
+      });
+      provider.onStatusChange?.({ state: 'warming' });
 
       ensureWorker();
       serverCwd = cwd;
 
       initPromise = (async () => {
         try {
-          await sendRequest("initialize", { cwd, file: options?.file });
+          await sendRequest('initialize', { cwd, file: options?.file });
           initialized = true;
           replaySyncQueue();
           initPromise = undefined;
         } catch (e) {
-          log("eslint-provider", "prewarm: error", {
+          log('eslint-provider', 'prewarm: error', {
             error: e instanceof Error ? e.message : String(e),
           });
           initPromise = undefined;
@@ -338,9 +382,9 @@ export const createEslintProvider = (): DiagnosticsProvider => {
     },
 
     dispose(): void {
-      log("eslint-provider", "dispose");
+      log('eslint-provider', 'dispose');
       if (worker) {
-        worker.postMessage({ command: "shutdown" });
+        worker.postMessage({ command: 'shutdown' });
         worker = undefined;
       }
       pending.clear();
@@ -349,7 +393,7 @@ export const createEslintProvider = (): DiagnosticsProvider => {
       initialized = false;
       initPromise = undefined;
       serverCwd = undefined;
-      provider.onStatusChange?.({ state: "stopped" });
+      provider.onStatusChange?.({ state: 'stopped' });
     },
   };
 

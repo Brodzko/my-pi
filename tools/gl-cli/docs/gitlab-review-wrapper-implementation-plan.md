@@ -10,21 +10,21 @@ Build a portable `gl` CLI that enables agent-assisted code review workflows on G
 
 ## Decisions (frozen)
 
-| Topic | Decision |
-|---|---|
-| Project resolution | Auto-detect from git `origin` remote URL. No `--project` flag. Fail if not in a git repo or no GitLab remote found. |
-| Authentication | Delegate fully to `glab`. On first API call, verify via `glab auth status`. If not authenticated, error with `AUTH_REQUIRED` and instruct to run `glab auth login`. CLI never handles tokens directly. |
-| Provider layer | All GitLab calls go through `glab` subprocess. Use `glab mr ...` for high-level commands and `glab api ...` for raw REST endpoints (discussions, line positions). Always force `--output json` or parse JSON responses. Validate all output with Zod schemas. |
-| Output format | JSON to stdout by default. All human-readable logs/errors to stderr. No `--json` flag needed. |
-| Config files | None. No `.gl/` directory. Project from git remote, auth from `glab`, no per-repo config. |
-| Multi-host | Not needed. Single internal company GitLab instance. `glab` handles host resolution. |
-| Exit codes | `0` for success, `1` for any error. Error details in the JSON error envelope. |
-| Schema discovery | `--schema` flag on every command. Prints the Zod input schema as JSON and exits. This is the contract — no separate `cli-contract.json`. |
-| Line comment positioning | Auto-resolved internally from MR diff versions. Public API exposes only `file`, `line`, `lineType`. SHAs never exposed to callers. If line is not in diff, return `LINE_NOT_IN_DIFF` error with valid line ranges. |
-| `mr get` default sections | `--include` defaults to `basics` only. Discussions and changes can be large; agent must explicitly opt in. Skill instructions document which `--include` sets to use per intent. |
-| Batch failure handling | Individual action failures don't abort the batch. Response includes both `applied` and `failed` arrays. |
-| Duplicate prevention | `--unique` on `mr note create` — lists existing notes, skips if body matches. |
-| Idempotency key | Deferred to Phase 2. Reserved in `review.json` schema but not implemented. |
+| Topic                     | Decision                                                                                                                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project resolution        | Auto-detect from git `origin` remote URL. No `--project` flag. Fail if not in a git repo or no GitLab remote found.                                                                                                                                           |
+| Authentication            | Delegate fully to `glab`. On first API call, verify via `glab auth status`. If not authenticated, error with `AUTH_REQUIRED` and instruct to run `glab auth login`. CLI never handles tokens directly.                                                        |
+| Provider layer            | All GitLab calls go through `glab` subprocess. Use `glab mr ...` for high-level commands and `glab api ...` for raw REST endpoints (discussions, line positions). Always force `--output json` or parse JSON responses. Validate all output with Zod schemas. |
+| Output format             | JSON to stdout by default. All human-readable logs/errors to stderr. No `--json` flag needed.                                                                                                                                                                 |
+| Config files              | None. No `.gl/` directory. Project from git remote, auth from `glab`, no per-repo config.                                                                                                                                                                     |
+| Multi-host                | Not needed. Single internal company GitLab instance. `glab` handles host resolution.                                                                                                                                                                          |
+| Exit codes                | `0` for success, `1` for any error. Error details in the JSON error envelope.                                                                                                                                                                                 |
+| Schema discovery          | `--schema` flag on every command. Prints the Zod input schema as JSON and exits. This is the contract — no separate `cli-contract.json`.                                                                                                                      |
+| Line comment positioning  | Auto-resolved internally from MR diff versions. Public API exposes only `file`, `line`, `lineType`. SHAs never exposed to callers. If line is not in diff, return `LINE_NOT_IN_DIFF` error with valid line ranges.                                            |
+| `mr get` default sections | `--include` defaults to `basics` only. Discussions and changes can be large; agent must explicitly opt in. Skill instructions document which `--include` sets to use per intent.                                                                              |
+| Batch failure handling    | Individual action failures don't abort the batch. Response includes both `applied` and `failed` arrays.                                                                                                                                                       |
+| Duplicate prevention      | `--unique` on `mr note create` — lists existing notes, skips if body matches.                                                                                                                                                                                 |
+| Idempotency key           | Deferred to Phase 2. Reserved in `review.json` schema but not implemented.                                                                                                                                                                                    |
 
 ---
 
@@ -93,30 +93,32 @@ gl mr review submit --iid <number> --input <review.json> [--dry-run]
 ### JSON envelope (stdout only)
 
 Success:
+
 ```json
 { "ok": true, "data": { ... }, "meta": { "dryRun": false } }
 ```
 
 Error:
+
 ```json
 { "ok": false, "error": { "code": "NOT_FOUND", "message": "MR !42 not found", "details": { ... } } }
 ```
 
 ### Error codes
 
-| Code | When |
-|---|---|
-| `AUTH_REQUIRED` | `glab auth status` fails — user needs to `glab auth login` |
-| `NOT_IN_GIT_REPO` | Not inside a git repository |
-| `NO_GITLAB_REMOTE` | No GitLab remote URL found on `origin` |
-| `NOT_FOUND` | MR, discussion, or resource doesn't exist |
-| `VALIDATION_ERROR` | Invalid CLI args or `review.json` schema violation |
-| `LINE_NOT_IN_DIFF` | Specified file+line not in MR diff. `details` includes valid line ranges. |
-| `PRECONDITION_FAILED` | Strict checks failed (e.g., unresolved threads when approving) |
-| `UPSTREAM_ERROR` | GitLab API returned unexpected error |
-| `GLAB_ERROR` | `glab` subprocess failed unexpectedly |
-| `LOCAL_GIT_ERROR` | Git operation failed (checkout, remote parsing) |
-| `UNKNOWN` | Unclassified error |
+| Code                  | When                                                                      |
+| --------------------- | ------------------------------------------------------------------------- |
+| `AUTH_REQUIRED`       | `glab auth status` fails — user needs to `glab auth login`                |
+| `NOT_IN_GIT_REPO`     | Not inside a git repository                                               |
+| `NO_GITLAB_REMOTE`    | No GitLab remote URL found on `origin`                                    |
+| `NOT_FOUND`           | MR, discussion, or resource doesn't exist                                 |
+| `VALIDATION_ERROR`    | Invalid CLI args or `review.json` schema violation                        |
+| `LINE_NOT_IN_DIFF`    | Specified file+line not in MR diff. `details` includes valid line ranges. |
+| `PRECONDITION_FAILED` | Strict checks failed (e.g., unresolved threads when approving)            |
+| `UPSTREAM_ERROR`      | GitLab API returned unexpected error                                      |
+| `GLAB_ERROR`          | `glab` subprocess failed unexpectedly                                     |
+| `LOCAL_GIT_ERROR`     | Git operation failed (checkout, remote parsing)                           |
+| `UNKNOWN`             | Unclassified error                                                        |
 
 ### Logging
 
@@ -175,25 +177,25 @@ Single code path: `execGlab(args: string[]) → { stdout: string, stderr: string
 
 ### Direct `glab mr` commands
 
-| `gl` command | `glab` command | Notes |
-|---|---|---|
-| `mr list` | `glab mr list --output json` | Full filter/sort support |
-| `mr checkout` | `glab mr checkout` | `--branch` for naming |
-| `mr note create` | `glab mr note --output json` | `--message`, `--unique` |
-| `mr approve` | `glab mr approve` | `--sha` for safety |
-| `mr unapprove` | `glab mr revoke` | |
+| `gl` command     | `glab` command               | Notes                    |
+| ---------------- | ---------------------------- | ------------------------ |
+| `mr list`        | `glab mr list --output json` | Full filter/sort support |
+| `mr checkout`    | `glab mr checkout`           | `--branch` for naming    |
+| `mr note create` | `glab mr note --output json` | `--message`, `--unique`  |
+| `mr approve`     | `glab mr approve`            | `--sha` for safety       |
+| `mr unapprove`   | `glab mr revoke`             |                          |
 
 ### Via `glab api` (raw REST)
 
-| `gl` command | GitLab API endpoint | Why not `glab mr`? |
-|---|---|---|
-| `mr get` (discussions) | `GET /projects/:id/merge_requests/:iid/discussions` | Need full position metadata |
-| `mr get` (changes) | `GET /projects/:id/merge_requests/:iid/changes` | Need file-level diff stats |
-| `mr get` (approvals) | `GET /projects/:id/merge_requests/:iid/approvals` | Richer than `glab` output |
-| `mr note create-line` | `POST /projects/:id/merge_requests/:iid/discussions` | Requires diff position payload |
-| `mr discussion reply` | `POST /projects/:id/merge_requests/:iid/discussions/:id/notes` | Not exposed by `glab mr` |
-| `mr discussion resolve` | `PUT /projects/:id/merge_requests/:iid/discussions/:id` | Not exposed by `glab mr` |
-| `mr get` (diff versions) | `GET /projects/:id/merge_requests/:iid/versions` | Needed to resolve SHAs for line comments |
+| `gl` command             | GitLab API endpoint                                            | Why not `glab mr`?                       |
+| ------------------------ | -------------------------------------------------------------- | ---------------------------------------- |
+| `mr get` (discussions)   | `GET /projects/:id/merge_requests/:iid/discussions`            | Need full position metadata              |
+| `mr get` (changes)       | `GET /projects/:id/merge_requests/:iid/changes`                | Need file-level diff stats               |
+| `mr get` (approvals)     | `GET /projects/:id/merge_requests/:iid/approvals`              | Richer than `glab` output                |
+| `mr note create-line`    | `POST /projects/:id/merge_requests/:iid/discussions`           | Requires diff position payload           |
+| `mr discussion reply`    | `POST /projects/:id/merge_requests/:iid/discussions/:id/notes` | Not exposed by `glab mr`                 |
+| `mr discussion resolve`  | `PUT /projects/:id/merge_requests/:iid/discussions/:id`        | Not exposed by `glab mr`                 |
+| `mr get` (diff versions) | `GET /projects/:id/merge_requests/:iid/versions`               | Needed to resolve SHAs for line comments |
 
 ---
 
@@ -294,7 +296,14 @@ This is entirely internal. The caller never provides or sees SHAs.
       { "index": 3, "type": "resolve", "discussionId": "abc123" }
     ],
     "failed": [
-      { "index": 4, "type": "unresolve", "error": { "code": "NOT_FOUND", "message": "Discussion def456 not found" } }
+      {
+        "index": 4,
+        "type": "unresolve",
+        "error": {
+          "code": "NOT_FOUND",
+          "message": "Discussion def456 not found"
+        }
+      }
     ],
     "summary": { "posted": true, "id": "n5" },
     "approval": { "attempted": true, "approved": true }
@@ -371,6 +380,7 @@ gl mr list --author alice | jq '.data[] | { iid, title, pipelineStatus }'
 ### `gl mr get --iid 123 --include basics,changes,discussions,pipeline,approvals`
 
 Design principles for jq ergonomics:
+
 - **`changes`**: single `changeType` enum instead of 3 booleans (`newFile`/`renamedFile`/`deletedFile`)
 - **`discussions`**: `position` hoisted to discussion level (from first positioned note). System notes excluded by default.
 - **All sections**: flat enough for single-level `jq` selects
@@ -507,6 +517,7 @@ gl mr get --iid 123 --include discussions | jq '.data.discussions[] | select(.re
 ## Testing Strategy
 
 ### Unit tests
+
 - Zod schema validation (valid + invalid inputs)
 - Git remote URL parsing (SSH, HTTPS, various formats)
 - glab output normalization to domain types
@@ -514,12 +525,14 @@ gl mr get --iid 123 --include discussions | jq '.data.discussions[] | select(.re
 - `review.json` validation and execution plan generation
 
 ### Integration tests (mocked glab)
+
 - Mock `execGlab` to return fixture JSON
 - Test full command flows: list → get → note → approve
 - Line comment positioning validation against fixture diffs
 - Batch review with mixed success/failure actions
 
 ### Smoke tests (optional, real GitLab)
+
 - Gated by `GL_SMOKE_TEST=1` env var
 - Run against a sandbox project
 - Read-only tests only by default; write tests behind additional flag

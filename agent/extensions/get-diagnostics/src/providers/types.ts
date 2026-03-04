@@ -1,4 +1,4 @@
-import type { NormalizedDiagnostic } from "../types";
+import type { NormalizedDiagnostic } from '../types';
 
 export type ProviderParams = {
   cwd: string;
@@ -23,7 +23,12 @@ export type PrewarmDoneInfo = {
  * - error:    server crashed or failed to start
  * - stopped:  explicitly disposed (session shutdown)
  */
-export type ProviderStatusState = "starting" | "warming" | "ready" | "error" | "stopped";
+export type ProviderStatusState =
+  | 'starting'
+  | 'warming'
+  | 'ready'
+  | 'error'
+  | 'stopped';
 
 export type ProviderStatusInfo = {
   state: ProviderStatusState;

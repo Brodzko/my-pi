@@ -4,6 +4,7 @@ Capture durable architecture/product decisions.
 Avoid logging temporary implementation details.
 
 ## Entry Template
+
 - ID: DEC-YYYYMMDD-XX
 - Scope: repo | package | feature
 - Tags: [area, package, architecture]

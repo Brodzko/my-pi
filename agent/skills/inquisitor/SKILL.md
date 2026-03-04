@@ -20,6 +20,7 @@ Use this skill whenever progress depends on a **finite user choice**.
 ## Decision rubric (quick)
 
 Use `choose_options` if all are true:
+
 1. You need user input to continue.
 2. You can list 2+ concrete choices now.
 3. Returning selected IDs would unblock the next action.

@@ -57,23 +57,23 @@ Communication protocol (entire thing):
 ```ts
 // Main → Worker
 type WorkerRequest =
-  | { type: "prewarm"; id: string; cwd: string }
+  | { type: 'prewarm'; id: string; cwd: string }
   | {
-      type: "getDiagnostics";
+      type: 'getDiagnostics';
       id: string;
       files: string[];
       cwd: string;
       content?: string;
       contentPath?: string;
     }
-  | { type: "syncDocument"; filePath: string; content?: string }
-  | { type: "dispose" };
+  | { type: 'syncDocument'; filePath: string; content?: string }
+  | { type: 'dispose' };
 
 // Worker → Main
 type WorkerResponse =
-  | { type: "result"; id: string; diagnostics: NormalizedDiagnostic[] }
-  | { type: "error"; id: string; message: string }
-  | { type: "ready" };
+  | { type: 'result'; id: string; diagnostics: NormalizedDiagnostic[] }
+  | { type: 'error'; id: string; message: string }
+  | { type: 'ready' };
 ```
 
 That's the entire protocol. Compare with the current implementation's daemon
@@ -166,12 +166,12 @@ extensions/get-diagnostics/
 Shared types used across the extension.
 
 ```ts
-type DiagnosticsProviderId = "typescript" | "eslint";
+type DiagnosticsProviderId = 'typescript' | 'eslint';
 
 type NormalizedDiagnostic = {
   provider: string;
   path: string; // relative to cwd
-  severity: "error" | "warning" | "info" | "hint";
+  severity: 'error' | 'warning' | 'info' | 'hint';
   message: string;
   code?: string;
   source?: string;
@@ -186,7 +186,7 @@ type GetDiagnosticsResult = {
   providerStatus: Record<
     string,
     {
-      status: "ok" | "error" | "timeout" | "skipped";
+      status: 'ok' | 'error' | 'timeout' | 'skipped';
       timingMs: number;
       message?: string;
     }
@@ -234,7 +234,6 @@ with appropriate TypeScript loader (tsx via `execArgv`).
    via `ts.findConfigFile`. Cache per workspace root.
 
 2. **Language service creation (per workspace root):**
-
    - Parse tsconfig: `ts.readConfigFile` + `ts.parseJsonConfigFileContent`.
    - Implement `LanguageServiceHost`:
      - `getScriptFileNames()` — files from tsconfig.
@@ -250,20 +249,20 @@ with appropriate TypeScript loader (tsx via `execArgv`).
 3. **Message handler:**
 
    ```ts
-   parentPort.on("message", (msg: WorkerRequest) => {
+   parentPort.on('message', (msg: WorkerRequest) => {
      switch (msg.type) {
-       case "prewarm":
+       case 'prewarm':
          // Create language service, call service.getProgram() to force load
          // Post { type: 'result', id, diagnostics: [] } when done
          break;
-       case "getDiagnostics":
+       case 'getDiagnostics':
          // For each file: getSyntacticDiagnostics + getSemanticDiagnostics
          // Normalize and post back
          break;
-       case "syncDocument":
+       case 'syncDocument':
          // Update snapshot map, bump version
          break;
-       case "dispose":
+       case 'dispose':
          // service.dispose() for all cached services
          break;
      }
@@ -294,23 +293,25 @@ const createTypescriptProvider = (): DiagnosticsProvider => {
 
   const ensureWorker = () => {
     if (worker) return;
-    worker = new Worker(new URL("./typescript-worker.ts", import.meta.url), {
-      execArgv: ["--import", "tsx/esm"],
+    worker = new Worker(new URL('./typescript-worker.ts', import.meta.url), {
+      execArgv: ['--import', 'tsx/esm'],
     });
-    workerReady = new Promise((resolve) => {
-      worker.once("message", (msg) => {
-        if (msg.type === "ready") resolve();
+    workerReady = new Promise(resolve => {
+      worker.once('message', msg => {
+        if (msg.type === 'ready') resolve();
       });
     });
-    worker.on("message", (msg: WorkerResponse) => {
-      if (msg.type === "result" || msg.type === "error") {
+    worker.on('message', (msg: WorkerResponse) => {
+      if (msg.type === 'result' || msg.type === 'error') {
         const p = pending.get(msg.id);
         if (!p) return;
         pending.delete(msg.id);
-        msg.type === "result" ? p.resolve(msg.diagnostics) : p.reject(new Error(msg.message));
+        msg.type === 'result'
+          ? p.resolve(msg.diagnostics)
+          : p.reject(new Error(msg.message));
       }
     });
-    worker.on("exit", () => {
+    worker.on('exit', () => {
       /* reject all pending, clear worker ref */
     });
   };
@@ -324,25 +325,25 @@ const createTypescriptProvider = (): DiagnosticsProvider => {
   };
 
   return {
-    id: "typescript",
-    isFileSupported: (f) => /\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(f),
-    getDiagnostics: (params) =>
+    id: 'typescript',
+    isFileSupported: f => /\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(f),
+    getDiagnostics: params =>
       request({
-        type: "getDiagnostics",
+        type: 'getDiagnostics',
         id: randomUUID(),
         ...params,
       }),
-    prewarm: (cwd) => {
+    prewarm: cwd => {
       ensureWorker();
-      worker.postMessage({ type: "prewarm", id: randomUUID(), cwd });
+      worker.postMessage({ type: 'prewarm', id: randomUUID(), cwd });
       // Fire-and-forget. Result is that the language service is warm.
     },
     syncDocument: (filePath, content) => {
       if (!worker) return; // No worker yet = nothing to sync
-      worker.postMessage({ type: "syncDocument", filePath, content });
+      worker.postMessage({ type: 'syncDocument', filePath, content });
     },
     dispose: () => {
-      worker?.postMessage({ type: "dispose" });
+      worker?.postMessage({ type: 'dispose' });
       worker?.terminate();
       worker = undefined;
     },
@@ -369,16 +370,16 @@ const createEslintProvider = (): DiagnosticsProvider => {
     if (existing) return existing;
 
     // Dynamic import — resolves from project's node_modules
-    const { ESLint } = await import("eslint");
+    const { ESLint } = await import('eslint');
     const instance = new ESLint({ cwd });
     instances.set(cwd, instance);
     return instance;
   };
 
   return {
-    id: "eslint",
-    isFileSupported: (f) => /\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(f),
-    getDiagnostics: async (params) => {
+    id: 'eslint',
+    isFileSupported: f => /\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(f),
+    getDiagnostics: async params => {
       const eslint = await getOrCreate(params.cwd);
 
       if (params.content && params.contentPath) {
@@ -408,7 +409,6 @@ Orchestrates provider execution.
    `['typescript']`. Filter to registered providers.
 
 2. **File resolution:**
-
    - Single file → use directly.
    - Directory → glob for supported files (via `tinyglobby`), filter by
      provider support, cap at `maxFiles` (default 200).
@@ -444,12 +444,12 @@ const setup = (pi: ExtensionAPI) => {
   registerGetDiagnosticsTool(pi, service);
 
   // Background prewarm on session start — non-blocking
-  pi.on("session_start", (_event, ctx) => {
+  pi.on('session_start', (_event, ctx) => {
     tsProvider.prewarm?.(ctx.cwd);
   });
 
   // Document sync after file mutations
-  pi.on("tool_result", (event, ctx) => {
+  pi.on('tool_result', (event, ctx) => {
     const payload = extractSyncPayload(event, ctx.cwd);
     if (payload) {
       service.syncDocument(payload.path, payload.content);
@@ -457,7 +457,7 @@ const setup = (pi: ExtensionAPI) => {
   });
 
   // Cleanup
-  pi.on("session_shutdown", async () => {
+  pi.on('session_shutdown', async () => {
     service.dispose();
   });
 };
@@ -495,7 +495,7 @@ TUI rendering for `renderCall` and `renderResult`.
 ### `index.ts` (1 line)
 
 ```ts
-export { default } from "./src/extension";
+export { default } from './src/extension';
 ```
 
 ### `package.json`

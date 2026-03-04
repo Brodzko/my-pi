@@ -1,11 +1,17 @@
-import type { ExtensionContext, ThemeColor } from '@mariozechner/pi-coding-agent';
+import type {
+  ExtensionContext,
+  ThemeColor,
+} from '@mariozechner/pi-coding-agent';
 import type { ReadonlyFooterDataProvider } from '@mariozechner/pi-coding-agent';
 import type { TUI } from '@mariozechner/pi-tui';
 import { truncateToWidth, visibleWidth } from '@mariozechner/pi-tui';
 import type { StatuslineEditor, EditorInfo } from './editor';
 import { formatTokens } from './format';
 import { PROGRESS_WIDTH, renderProgressBar } from './progress-bar';
-import { renderSubscriptionLines, modelProviderToUsageProvider } from './subscription-footer';
+import {
+  renderSubscriptionLines,
+  modelProviderToUsageProvider,
+} from './subscription-footer';
 import {
   fetchSubscriptionUsageEntries,
   type ProviderId,
@@ -23,7 +29,18 @@ type FooterDeps = {
 
 const subscriptionRefreshMs = 60_000;
 const TURN_SPINNER_INTERVAL_MS = 100;
-const TURN_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
+const TURN_SPINNER_FRAMES = [
+  '⠋',
+  '⠙',
+  '⠹',
+  '⠸',
+  '⠼',
+  '⠴',
+  '⠦',
+  '⠧',
+  '⠇',
+  '⠏',
+] as const;
 
 export const createFooter = (
   tui: TUI,
@@ -67,7 +84,9 @@ export const createFooter = (
     isSubscriptionLoading = true;
 
     try {
-      const activeUsageProvider = modelProviderToUsageProvider(deps.ctx.model?.provider);
+      const activeUsageProvider = modelProviderToUsageProvider(
+        deps.ctx.model?.provider
+      );
       if (!activeUsageProvider) {
         subscriptionEntries = null;
         lastActiveUsageProvider = null;
@@ -109,7 +128,9 @@ export const createFooter = (
         tui.requestRender();
       }
 
-      const activeUsageProvider = modelProviderToUsageProvider(deps.ctx.model?.provider);
+      const activeUsageProvider = modelProviderToUsageProvider(
+        deps.ctx.model?.provider
+      );
       const providerChanged = activeUsageProvider !== lastActiveUsageProvider;
       if (providerChanged && !isSubscriptionLoading) {
         subscriptionEntries = null;
@@ -144,7 +165,12 @@ export const createFooter = (
 
       return [
         primaryLine,
-        ...renderSubscriptionLines(subscriptionEntries, isSubscriptionLoading, theme, width),
+        ...renderSubscriptionLines(
+          subscriptionEntries,
+          isSubscriptionLoading,
+          theme,
+          width
+        ),
       ];
     },
   };
@@ -185,7 +211,10 @@ const renderWithUsage = (
 ): string => {
   const percent = Math.min(100, Math.round(usage.percent!));
   const bar = renderProgressBar(percent, PROGRESS_WIDTH, theme);
-  const label = theme.fg('dim', ` ${percent}%/${formatTokens(usage.contextWindow)}`);
+  const label = theme.fg(
+    'dim',
+    ` ${percent}%/${formatTokens(usage.contextWindow)}`
+  );
   const left = `${bar}${label}`;
 
   const right = [statusStr, turnSpinner].filter(Boolean).join(' ');

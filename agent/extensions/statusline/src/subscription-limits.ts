@@ -48,7 +48,10 @@ const openAiUsageEndpoint = 'https://chatgpt.com/backend-api/wham/usage';
 const anthropicUsageEndpoint = 'https://api.anthropic.com/api/oauth/usage';
 
 const timeoutMs = 4000;
-const debugLogPath = path.resolve(process.cwd(), '.brodzko/statusline-subscription-usage.log');
+const debugLogPath = path.resolve(
+  process.cwd(),
+  '.brodzko/statusline-subscription-usage.log'
+);
 
 const safeJson = (value: unknown): string => {
   try {
@@ -58,7 +61,10 @@ const safeJson = (value: unknown): string => {
   }
 };
 
-const writeDebugLog = async (message: string, details?: unknown): Promise<void> => {
+const writeDebugLog = async (
+  message: string,
+  details?: unknown
+): Promise<void> => {
   const line = `${new Date().toISOString()} ${message}${details === undefined ? '' : ` ${safeJson(details)}`}\n`;
 
   try {
@@ -134,12 +140,14 @@ const normalizeWindowKey = (value: unknown): WindowKey | null => {
 const toOAuthCredential = (value: unknown): OAuthCredential | null => {
   if (!isObject(value)) return null;
   if (value.type !== 'oauth') return null;
-  if (typeof value.access !== 'string' || value.access.length === 0) return null;
+  if (typeof value.access !== 'string' || value.access.length === 0)
+    return null;
 
   return {
     type: 'oauth',
     access: value.access,
-    accountId: typeof value.accountId === 'string' ? value.accountId : undefined,
+    accountId:
+      typeof value.accountId === 'string' ? value.accountId : undefined,
   };
 };
 
@@ -214,7 +222,9 @@ const inferWindowKeyFromRecord = (
   keyHint: string,
   record: Record<string, unknown>
 ): WindowKey | null => {
-  const explicit = normalizeWindowKey(record.window ?? record.limit_name ?? keyHint);
+  const explicit = normalizeWindowKey(
+    record.window ?? record.limit_name ?? keyHint
+  );
   if (explicit) return explicit;
 
   const resetSeconds = numberFromUnknown(
@@ -305,7 +315,10 @@ const readOpenAiWindows = (payload: unknown): WindowUsage[] => {
       tryAddWindow(limitName, entry.rate_limit ?? entry);
 
       if (!windows.has('1w') && isObject(entry.rate_limit ?? entry)) {
-        const candidate = (entry.rate_limit ?? entry) as Record<string, unknown>;
+        const candidate = (entry.rate_limit ?? entry) as Record<
+          string,
+          unknown
+        >;
         windows.set('1w', parseWindowRecordForKey('1w', candidate));
       }
     }
@@ -516,7 +529,9 @@ export const fetchSubscriptionUsageEntries = async (
   const providers = activeProvider ? [activeProvider] : providerOrder;
 
   for (const provider of providers) {
-    const credential = toOAuthCredential(ctx.modelRegistry.authStorage.get(provider));
+    const credential = toOAuthCredential(
+      ctx.modelRegistry.authStorage.get(provider)
+    );
     if (!credential) {
       await writeDebugLog(`[${provider}] no oauth credential found`);
       continue;

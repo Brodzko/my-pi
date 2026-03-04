@@ -20,14 +20,14 @@
  * time. If a new request arrives while one is in-flight, we queue it and execute
  * after the current request completes. No work is wasted by cancellation.
  */
-import { spawn, type ChildProcess } from "node:child_process";
-import { createRequire } from "node:module";
-import * as path from "node:path";
-import * as fs from "node:fs";
-import type { NormalizedDiagnostic, DiagnosticSeverity } from "../types";
-import type { DiagnosticsProvider, ProviderParams } from "./types";
-import { log } from "../logger";
-import { findPrewarmFile } from "../prewarm-discovery";
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createRequire } from 'node:module';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import type { NormalizedDiagnostic, DiagnosticSeverity } from '../types';
+import type { DiagnosticsProvider, ProviderParams } from './types';
+import { log } from '../logger';
+import { findPrewarmFile } from '../prewarm-discovery';
 
 // --- tsserver protocol types ---
 
@@ -42,14 +42,15 @@ type TsServerDiag = {
 // --- Resolve tsserver from project ---
 
 const resolveTsServerPath = (
-  cwd: string,
+  cwd: string
 ): { tsserverPath: string; tsVersion: string } | undefined => {
   // Try project's node_modules (createRequire walks up automatically for monorepos)
   try {
-    const projectRequire = createRequire(path.join(cwd, "package.json"));
-    const tsserverPath = projectRequire.resolve("typescript/lib/tsserver.js");
-    const pkgPath = path.join(path.dirname(tsserverPath), "..", "package.json");
-    const version = JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version as string;
+    const projectRequire = createRequire(path.join(cwd, 'package.json'));
+    const tsserverPath = projectRequire.resolve('typescript/lib/tsserver.js');
+    const pkgPath = path.join(path.dirname(tsserverPath), '..', 'package.json');
+    const version = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+      .version as string;
     return { tsserverPath, tsVersion: version };
   } catch {
     // Not found in project
@@ -58,9 +59,10 @@ const resolveTsServerPath = (
   // Fall back to bundled TypeScript
   try {
     const bundledRequire = createRequire(import.meta.url);
-    const tsserverPath = bundledRequire.resolve("typescript/lib/tsserver.js");
-    const pkgPath = path.join(path.dirname(tsserverPath), "..", "package.json");
-    const version = JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version as string;
+    const tsserverPath = bundledRequire.resolve('typescript/lib/tsserver.js');
+    const pkgPath = path.join(path.dirname(tsserverPath), '..', 'package.json');
+    const version = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+      .version as string;
     return { tsserverPath, tsVersion: version };
   } catch {
     return undefined;
@@ -70,9 +72,9 @@ const resolveTsServerPath = (
 // --- TsServer process wrapper ---
 
 const CATEGORY_TO_SEVERITY: Record<string, DiagnosticSeverity> = {
-  error: "error",
-  warning: "warning",
-  suggestion: "hint",
+  error: 'error',
+  warning: 'warning',
+  suggestion: 'hint',
 };
 
 type GetErrQueueEntry = {
@@ -137,39 +139,50 @@ class TsServer {
   constructor(
     tsserverPath: string,
     readonly cwd: string,
-    tsVersion: string,
+    tsVersion: string
   ) {
     this.tsVersion = tsVersion;
 
-    log("tsserver", "starting", { tsserverPath, cwd, tsVersion, pid: process.pid });
+    log('tsserver', 'starting', {
+      tsserverPath,
+      cwd,
+      tsVersion,
+      pid: process.pid,
+    });
 
     this.proc = spawn(
-      "node",
-      ["--max-old-space-size=4096", tsserverPath, "--disableAutomaticTypingAcquisition"],
+      'node',
+      [
+        '--max-old-space-size=4096',
+        tsserverPath,
+        '--disableAutomaticTypingAcquisition',
+      ],
       {
         cwd,
-        stdio: ["pipe", "pipe", "pipe"],
-      },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
     );
 
     // Don't keep pi's event loop alive
     this.proc.unref();
 
-    this.proc.stdout!.on("data", (chunk: Buffer) => this.onData(chunk));
-    this.proc.stderr!.on("data", (chunk: Buffer) => {
+    this.proc.stdout!.on('data', (chunk: Buffer) => this.onData(chunk));
+    this.proc.stderr!.on('data', (chunk: Buffer) => {
       const text = chunk.toString().trim();
-      if (text) log("tsserver-stderr", text);
+      if (text) log('tsserver-stderr', text);
     });
-    this.proc.on("error", (err) => {
-      log("tsserver", "process error", { error: err.message });
+    this.proc.on('error', err => {
+      log('tsserver', 'process error', { error: err.message });
       this.alive = false;
       this.rejectAll(new Error(`tsserver error: ${err.message}`));
       this.onProcessDeath?.(`process error: ${err.message}`);
     });
-    this.proc.on("exit", (code, signal) => {
-      log("tsserver", "process exited", { code, signal });
+    this.proc.on('exit', (code, signal) => {
+      log('tsserver', 'process exited', { code, signal });
       this.alive = false;
-      this.rejectAll(new Error(`tsserver exited: code=${code} signal=${signal}`));
+      this.rejectAll(
+        new Error(`tsserver exited: code=${code} signal=${signal}`)
+      );
       // Only fire onProcessDeath for unexpected exits (not clean shutdown)
       if (code !== 0 && code !== null) {
         this.onProcessDeath?.(`exited with code ${code}`);
@@ -179,10 +192,13 @@ class TsServer {
     });
 
     // Wait for configure response to confirm server is ready
-    this.ready = this.request("configure", {
-      hostInfo: "get-diagnostics-extension",
+    this.ready = this.request('configure', {
+      hostInfo: 'get-diagnostics-extension',
     }).then(() => {
-      log("tsserver", "ready", { tsVersion: this.tsVersion, pid: this.proc.pid });
+      log('tsserver', 'ready', {
+        tsVersion: this.tsVersion,
+        pid: this.proc.pid,
+      });
     });
   }
 
@@ -195,18 +211,18 @@ class TsServer {
     if (content !== undefined) {
       // Content override: close (if open) + open with fileContent
       if (this.openFiles.has(file)) {
-        this.fire("close", { file });
+        this.fire('close', { file });
         this.openFiles.delete(file);
       }
-      this.fire("open", { file, fileContent: content });
+      this.fire('open', { file, fileContent: content });
       this.openFiles.set(file, Date.now());
     } else if (this.openFiles.has(file)) {
       // Already open: reload from disk, update access time
-      this.fire("reload", { file, tmpfile: file });
+      this.fire('reload', { file, tmpfile: file });
       this.openFiles.set(file, Date.now());
     } else {
       // Not open: open (reads from disk)
-      this.fire("open", { file });
+      this.fire('open', { file });
       this.openFiles.set(file, Date.now());
     }
 
@@ -227,11 +243,11 @@ class TsServer {
     const toEvict = entries.slice(0, entries.length - TsServer.MAX_OPEN_FILES);
 
     for (const [file] of toEvict) {
-      log("tsserver", "evicting LRU file", {
+      log('tsserver', 'evicting LRU file', {
         file: path.relative(this.cwd, file),
         openCount: this.openFiles.size,
       });
-      this.fire("close", { file });
+      this.fire('close', { file });
       this.openFiles.delete(file);
     }
   }
@@ -247,12 +263,14 @@ class TsServer {
    * request benefits from the prewarmed project.
    */
   getErr(files: string[]): Promise<Map<string, TsServerDiag[]>> {
-    if (!this.alive) return Promise.reject(new Error("tsserver not alive"));
+    if (!this.alive) return Promise.reject(new Error('tsserver not alive'));
 
     // Cancel any in-flight prewarm geterr (edge case — caller should have
     // awaited projectReady, but handle timeout/race gracefully)
     if (this.prewarmSeq !== undefined) {
-      log("tsserver", "cancelling prewarm geterr", { prewarmSeq: this.prewarmSeq });
+      log('tsserver', 'cancelling prewarm geterr', {
+        prewarmSeq: this.prewarmSeq,
+      });
       this.prewarmSeq = undefined;
       // Resolve projectReady so any other awaiter unblocks
       this.resolveProjectReady?.();
@@ -262,7 +280,7 @@ class TsServer {
 
     // If a real geterr is already in-flight, queue this request
     if (this.getErrState) {
-      log("tsserver", "getErr: queuing (in-flight request active)", {
+      log('tsserver', 'getErr: queuing (in-flight request active)', {
         queueLength: this.getErrQueue.length + 1,
         files: files.length,
       });
@@ -290,32 +308,32 @@ class TsServer {
     this.prewarmSeq = seq;
 
     // Create a new projectReady promise for this prewarm cycle
-    this.projectReady = new Promise<void>((resolve) => {
+    this.projectReady = new Promise<void>(resolve => {
       this.resolveProjectReady = resolve;
     });
 
     const msg = JSON.stringify({
       seq,
-      type: "request",
-      command: "geterr",
+      type: 'request',
+      command: 'geterr',
       arguments: { files, delay: 0 },
     });
-    this.proc.stdin!.write(msg + "\n");
-    log("tsserver", "prewarm geterr sent", {
+    this.proc.stdin!.write(msg + '\n');
+    log('tsserver', 'prewarm geterr sent', {
       seq,
-      files: files.map((f) => path.relative(this.cwd, f)),
+      files: files.map(f => path.relative(this.cwd, f)),
     });
   }
 
   /** Close a file (tells tsserver to forget cached content). */
   closeFile(file: string): void {
     if (!this.openFiles.has(file)) return;
-    this.fire("close", { file });
+    this.fire('close', { file });
     this.openFiles.delete(file);
   }
 
   shutdown(): void {
-    log("tsserver", "shutting down", { pid: this.proc.pid });
+    log('tsserver', 'shutting down', { pid: this.proc.pid });
     this.alive = false;
     this.openFiles.clear();
     // Resolve any pending projectReady so awaiters don't hang
@@ -323,7 +341,7 @@ class TsServer {
     this.resolveProjectReady = undefined;
     // Reject any queued getErr requests
     for (const entry of this.getErrQueue) {
-      entry.reject(new Error("tsserver shutdown"));
+      entry.reject(new Error('tsserver shutdown'));
     }
     this.getErrQueue = [];
     try {
@@ -332,7 +350,7 @@ class TsServer {
       // ignore
     }
     this.proc.kill();
-    this.rejectAll(new Error("tsserver shutdown"));
+    this.rejectAll(new Error('tsserver shutdown'));
   }
 
   // --- Private: getErr execution ---
@@ -341,8 +359,8 @@ class TsServer {
     const seq = this.nextSeq();
     const msg = JSON.stringify({
       seq,
-      type: "request",
-      command: "geterr",
+      type: 'request',
+      command: 'geterr',
       arguments: { files, delay: 0 },
     });
 
@@ -351,7 +369,7 @@ class TsServer {
       for (const f of files) diagnostics.set(f, []);
 
       this.getErrState = { requestSeq: seq, diagnostics, resolve, reject };
-      this.proc.stdin!.write(msg + "\n");
+      this.proc.stdin!.write(msg + '\n');
     });
   }
 
@@ -359,7 +377,7 @@ class TsServer {
   private drainQueue(): void {
     if (this.getErrQueue.length === 0) return;
     const next = this.getErrQueue.shift()!;
-    log("tsserver", "drainQueue: executing next", {
+    log('tsserver', 'drainQueue: executing next', {
       remaining: this.getErrQueue.length,
       files: next.files.length,
     });
@@ -382,19 +400,29 @@ class TsServer {
   private fire(command: string, args?: unknown): void {
     if (!this.alive) return;
     const seq = this.nextSeq();
-    const msg = JSON.stringify({ seq, type: "request", command, arguments: args });
-    this.proc.stdin!.write(msg + "\n");
+    const msg = JSON.stringify({
+      seq,
+      type: 'request',
+      command,
+      arguments: args,
+    });
+    this.proc.stdin!.write(msg + '\n');
   }
 
   /** Send command and wait for response. */
   private request(command: string, args?: unknown): Promise<unknown> {
-    if (!this.alive) return Promise.reject(new Error("tsserver not alive"));
+    if (!this.alive) return Promise.reject(new Error('tsserver not alive'));
     const seq = this.nextSeq();
-    const msg = JSON.stringify({ seq, type: "request", command, arguments: args });
+    const msg = JSON.stringify({
+      seq,
+      type: 'request',
+      command,
+      arguments: args,
+    });
 
     return new Promise((resolve, reject) => {
       this.responseCallbacks.set(seq, { resolve, reject });
-      this.proc.stdin!.write(msg + "\n");
+      this.proc.stdin!.write(msg + '\n');
     });
   }
 
@@ -407,10 +435,10 @@ class TsServer {
 
   private parseMessages(): void {
     for (;;) {
-      const headerEnd = this.buf.indexOf("\r\n\r\n");
+      const headerEnd = this.buf.indexOf('\r\n\r\n');
       if (headerEnd === -1) break;
 
-      const header = this.buf.subarray(0, headerEnd).toString("utf-8");
+      const header = this.buf.subarray(0, headerEnd).toString('utf-8');
       const match = header.match(/Content-Length:\s*(\d+)/i);
       if (!match) {
         // Skip malformed header
@@ -423,14 +451,16 @@ class TsServer {
 
       if (this.buf.length < bodyStart + contentLength) break; // need more data
 
-      const body = this.buf.subarray(bodyStart, bodyStart + contentLength).toString("utf-8");
+      const body = this.buf
+        .subarray(bodyStart, bodyStart + contentLength)
+        .toString('utf-8');
       this.buf = this.buf.subarray(bodyStart + contentLength);
 
       try {
         const msg = JSON.parse(body) as Record<string, unknown>;
         this.onMessage(msg);
       } catch {
-        log("tsserver", "JSON parse error", { body: body.slice(0, 200) });
+        log('tsserver', 'JSON parse error', { body: body.slice(0, 200) });
       }
     }
   }
@@ -438,32 +468,44 @@ class TsServer {
   // --- Private: message dispatch ---
 
   private onMessage(msg: Record<string, unknown>): void {
-    if (msg["type"] === "response") {
-      const requestSeq = msg["request_seq"] as number;
+    if (msg['type'] === 'response') {
+      const requestSeq = msg['request_seq'] as number;
       const handler = this.responseCallbacks.get(requestSeq);
       if (handler) {
         this.responseCallbacks.delete(requestSeq);
-        if (msg["success"]) {
-          handler.resolve(msg["body"]);
+        if (msg['success']) {
+          handler.resolve(msg['body']);
         } else {
-          handler.reject(new Error((msg["message"] as string) ?? "tsserver error"));
+          handler.reject(
+            new Error((msg['message'] as string) ?? 'tsserver error')
+          );
         }
       }
       // else: response for fire-and-forget command, ignore
-    } else if (msg["type"] === "event") {
-      this.onEvent(msg["event"] as string, msg["body"] as Record<string, unknown> | undefined);
+    } else if (msg['type'] === 'event') {
+      this.onEvent(
+        msg['event'] as string,
+        msg['body'] as Record<string, unknown> | undefined
+      );
     }
   }
 
-  private onEvent(event: string, body: Record<string, unknown> | undefined): void {
+  private onEvent(
+    event: string,
+    body: Record<string, unknown> | undefined
+  ): void {
     if (!body) return;
 
-    if (event === "syntaxDiag" || event === "semanticDiag" || event === "suggestionDiag") {
+    if (
+      event === 'syntaxDiag' ||
+      event === 'semanticDiag' ||
+      event === 'suggestionDiag'
+    ) {
       const state = this.getErrState;
       if (!state) return;
 
-      const file = body["file"] as string;
-      const diags = (body["diagnostics"] as TsServerDiag[]) ?? [];
+      const file = body['file'] as string;
+      const diags = (body['diagnostics'] as TsServerDiag[]) ?? [];
 
       const existing = state.diagnostics.get(file);
       if (existing) {
@@ -472,13 +514,16 @@ class TsServer {
         state.diagnostics.set(file, [...diags]);
       }
 
-      log("tsserver", event, { file: path.relative(this.cwd, file), count: diags.length });
-    } else if (event === "requestCompleted") {
-      const requestSeq = (body["request_seq"] as number) ?? 0;
+      log('tsserver', event, {
+        file: path.relative(this.cwd, file),
+        count: diags.length,
+      });
+    } else if (event === 'requestCompleted') {
+      const requestSeq = (body['request_seq'] as number) ?? 0;
 
       // Check if this completes the prewarm geterr
       if (this.prewarmSeq !== undefined && this.prewarmSeq === requestSeq) {
-        log("tsserver", "prewarm geterr completed", { seq: requestSeq });
+        log('tsserver', 'prewarm geterr completed', { seq: requestSeq });
         this.prewarmSeq = undefined;
         // Resolve projectReady — the project is fully loaded
         this.resolveProjectReady?.();
@@ -496,10 +541,14 @@ class TsServer {
         // Process next queued request
         this.drainQueue();
       }
-    } else if (event === "projectLoadingStart") {
-      log("tsserver", "project loading start", { project: body["projectName"] as string });
-    } else if (event === "projectLoadingFinish") {
-      log("tsserver", "project loading finish", { project: body["projectName"] as string });
+    } else if (event === 'projectLoadingStart') {
+      log('tsserver', 'project loading start', {
+        project: body['projectName'] as string,
+      });
+    } else if (event === 'projectLoadingFinish') {
+      log('tsserver', 'project loading finish', {
+        project: body['projectName'] as string,
+      });
     }
     // Ignore: telemetry, typingsInstallerPid, etc.
   }
@@ -535,35 +584,48 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
 
     const resolved = resolveTsServerPath(cwd);
     if (!resolved) {
-      throw new Error("TypeScript not found. Install typescript in the project.");
+      throw new Error(
+        'TypeScript not found. Install typescript in the project.'
+      );
     }
 
-    provider.onStatusChange?.({ state: "starting" });
+    provider.onStatusChange?.({ state: 'starting' });
     server = new TsServer(resolved.tsserverPath, cwd, resolved.tsVersion);
 
     // Track unexpected process death → update status
-    server.onProcessDeath = (message) => {
+    server.onProcessDeath = message => {
       server = undefined;
       reportedReady = false;
-      provider.onStatusChange?.({ state: "error", detail: message });
+      provider.onStatusChange?.({ state: 'error', detail: message });
     };
 
     return server;
   };
 
-  const supportedExtensions = ["ts", "tsx", "js", "jsx", "mts", "cts", "mjs", "cjs"] as const;
-  const extPattern = new RegExp(`\\.(${supportedExtensions.join("|")})$`);
+  const supportedExtensions = [
+    'ts',
+    'tsx',
+    'js',
+    'jsx',
+    'mts',
+    'cts',
+    'mjs',
+    'cjs',
+  ] as const;
+  const extPattern = new RegExp(`\\.(${supportedExtensions.join('|')})$`);
 
   const provider: DiagnosticsProvider = {
-    id: "typescript",
+    id: 'typescript',
     supportedExtensions,
     isFileSupported: (filePath: string) => extPattern.test(filePath),
     onPrewarmDone: undefined,
     onStatusChange: undefined,
 
-    async getDiagnostics(params: ProviderParams): Promise<NormalizedDiagnostic[]> {
+    async getDiagnostics(
+      params: ProviderParams
+    ): Promise<NormalizedDiagnostic[]> {
       const t0 = Date.now();
-      log("ts-provider", "getDiagnostics: start", {
+      log('ts-provider', 'getDiagnostics: start', {
         fileCount: params.files.length,
         cwd: params.cwd,
         hasContent: params.content !== undefined,
@@ -577,15 +639,17 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
       // If prewarm is still running, we wait — the project load is the expensive
       // part, and our geterr will be fast once it's done. The service-level
       // pTimeout is the safety net if prewarm takes too long.
-      log("ts-provider", "getDiagnostics: awaiting projectReady");
+      log('ts-provider', 'getDiagnostics: awaiting projectReady');
       await srv.projectReady;
-      log("ts-provider", "getDiagnostics: projectReady resolved", {
+      log('ts-provider', 'getDiagnostics: projectReady resolved', {
         waitMs: Date.now() - t0,
       });
 
       // Prepare files and collect absolute paths
-      const absFiles = params.files.map((file) => {
-        const absPath = path.isAbsolute(file) ? file : path.resolve(params.cwd, file);
+      const absFiles = params.files.map(file => {
+        const absPath = path.isAbsolute(file)
+          ? file
+          : path.resolve(params.cwd, file);
 
         const isContentTarget =
           params.content !== undefined &&
@@ -605,12 +669,12 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
         const relPath = path.relative(params.cwd, file);
         for (const d of diags) {
           diagnostics.push({
-            provider: "typescript",
+            provider: 'typescript',
             path: relPath,
-            severity: CATEGORY_TO_SEVERITY[d.category] ?? "info",
+            severity: CATEGORY_TO_SEVERITY[d.category] ?? 'info',
             message: d.text,
             code: `TS${d.code}`,
-            source: "typescript",
+            source: 'typescript',
             range: {
               start: { line: d.start.line - 1, character: d.start.offset - 1 },
               end: { line: d.end.line - 1, character: d.end.offset - 1 },
@@ -619,7 +683,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
         }
       }
 
-      log("ts-provider", "getDiagnostics: complete", {
+      log('ts-provider', 'getDiagnostics: complete', {
         totalMs: Date.now() - t0,
         diagnosticCount: diagnostics.length,
       });
@@ -628,18 +692,21 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
       // case where prewarm couldn't find a file (status stayed at "warming").
       if (!reportedReady) {
         reportedReady = true;
-        provider.onStatusChange?.({ state: "ready", detail: `TS ${srv.tsVersion}` });
+        provider.onStatusChange?.({
+          state: 'ready',
+          detail: `TS ${srv.tsVersion}`,
+        });
       }
 
       return diagnostics;
     },
 
     prewarm(cwd: string, options?: { file?: string }): void {
-      log("ts-provider", "prewarm: start", { cwd, hintFile: options?.file });
+      log('ts-provider', 'prewarm: start', { cwd, hintFile: options?.file });
       const t0 = Date.now();
 
       const srv = ensureServer(cwd);
-      provider.onStatusChange?.({ state: "warming" });
+      provider.onStatusChange?.({ state: 'warming' });
 
       // Open a file from the project to trigger project load in tsserver.
       // fireGetErr creates a projectReady promise that resolves when tsserver
@@ -651,7 +718,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
           // Use the service-provided file hint if available, otherwise discover
           const file = options?.file ?? findPrewarmFile(cwd);
           if (!file) {
-            log("ts-provider", "prewarm: no TS file found in project");
+            log('ts-provider', 'prewarm: no TS file found in project');
             // Stay in "warming" — we couldn't load the project. The first
             // getDiagnostics call will do the cold load, and we'll transition
             // to "ready" after it completes (see getDiagnostics path below).
@@ -661,7 +728,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
               success: false,
               tsVersion: srv.tsVersion,
               timingMs: Date.now() - t0,
-              message: "No TypeScript file found to prewarm",
+              message: 'No TypeScript file found to prewarm',
             });
             return;
           }
@@ -671,7 +738,7 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
           // file's tsconfig. We prewarm exactly one project — opening files
           // from multiple packages causes tsserver to load all their tsconfigs
           // serially (30+ seconds in a monorepo), blocking the geterr.
-          log("ts-provider", "prewarm: opening file + background geterr", {
+          log('ts-provider', 'prewarm: opening file + background geterr', {
             file: path.relative(cwd, file),
           });
           srv.prepareFile(file);
@@ -679,14 +746,14 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
           // Track completion: fire onPrewarmDone when tsserver finishes
           // loading the project (requestCompleted event for the prewarm geterr).
           srv.onPrewarmComplete = () => {
-            log("ts-provider", "prewarm: project loaded", {
+            log('ts-provider', 'prewarm: project loaded', {
               file: path.relative(cwd, file),
               totalMs: Date.now() - t0,
               tsVersion: srv.tsVersion,
             });
             reportedReady = true;
             provider.onStatusChange?.({
-              state: "ready",
+              state: 'ready',
               detail: `TS ${srv.tsVersion}`,
             });
             provider.onPrewarmDone?.({
@@ -698,10 +765,10 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
 
           srv.fireGetErr([file]);
         })
-        .catch((err) => {
+        .catch(err => {
           const message = err instanceof Error ? err.message : String(err);
-          log("ts-provider", "prewarm: error", { error: message });
-          provider.onStatusChange?.({ state: "error", detail: message });
+          log('ts-provider', 'prewarm: error', { error: message });
+          provider.onStatusChange?.({ state: 'error', detail: message });
           provider.onPrewarmDone?.({
             success: false,
             tsVersion: srv.tsVersion,
@@ -713,7 +780,9 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
 
     syncDocument(filePath: string, content?: string): void {
       if (!server) return;
-      const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(server.cwd, filePath);
+      const absPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(server.cwd, filePath);
 
       if (content !== undefined) {
         // Edit/write with content: close + reopen with new content so tsserver
@@ -731,14 +800,14 @@ export const createTypescriptProvider = (): DiagnosticsProvider => {
     },
 
     dispose(): void {
-      log("ts-provider", "dispose");
+      log('ts-provider', 'dispose');
       if (server) {
         // Clear onProcessDeath before shutdown to avoid spurious error status
         server.onProcessDeath = undefined;
         server.shutdown();
         server = undefined;
       }
-      provider.onStatusChange?.({ state: "stopped" });
+      provider.onStatusChange?.({ state: 'stopped' });
     },
   };
 

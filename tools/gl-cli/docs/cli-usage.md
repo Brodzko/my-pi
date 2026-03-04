@@ -143,15 +143,15 @@ gl mr list --verbose                    # Detailed progress to stderr (TBD)
 
 ## Error Codes
 
-| Code | Meaning |
-|---|---|
-| `AUTH_REQUIRED` | Run `glab auth login` |
-| `NOT_IN_GIT_REPO` | Not in a git repo |
-| `NO_GITLAB_REMOTE` | No GitLab remote on `origin` |
-| `NOT_FOUND` | Resource doesn't exist |
-| `VALIDATION_ERROR` | Bad args or schema |
-| `LINE_NOT_IN_DIFF` | Line not in MR diff |
-| `PRECONDITION_FAILED` | Strict check failed |
-| `UPSTREAM_ERROR` | GitLab API error |
-| `GLAB_ERROR` | glab subprocess failure |
-| `LOCAL_GIT_ERROR` | Git operation failed |
+| Code                  | Meaning                      |
+| --------------------- | ---------------------------- |
+| `AUTH_REQUIRED`       | Run `glab auth login`        |
+| `NOT_IN_GIT_REPO`     | Not in a git repo            |
+| `NO_GITLAB_REMOTE`    | No GitLab remote on `origin` |
+| `NOT_FOUND`           | Resource doesn't exist       |
+| `VALIDATION_ERROR`    | Bad args or schema           |
+| `LINE_NOT_IN_DIFF`    | Line not in MR diff          |
+| `PRECONDITION_FAILED` | Strict check failed          |
+| `UPSTREAM_ERROR`      | GitLab API error             |
+| `GLAB_ERROR`          | glab subprocess failure      |
+| `LOCAL_GIT_ERROR`     | Git operation failed         |

@@ -37,10 +37,10 @@
  *   Events (server → client, unsolicited):
  *     ← { event: "status", body: { state, detail? } }
  */
-import { parentPort } from "node:worker_threads";
-import * as path from "node:path";
-import * as fs from "node:fs";
-import { createRequire } from "node:module";
+import { parentPort } from 'node:worker_threads';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 
 // --- Types ---
 
@@ -61,7 +61,10 @@ type ESLintLintResult = {
 
 type ESLintInstance = {
   lintFiles: (patterns: string[]) => Promise<ESLintLintResult[]>;
-  lintText: (code: string, options?: { filePath?: string }) => Promise<ESLintLintResult[]>;
+  lintText: (
+    code: string,
+    options?: { filePath?: string }
+  ) => Promise<ESLintLintResult[]>;
 };
 
 type ESLintConstructor = new (options: { cwd: string }) => ESLintInstance;
@@ -92,7 +95,7 @@ const documents = new Map<string, string>();
 
 const readFromDisk = (file: string): string | undefined => {
   try {
-    return fs.readFileSync(file, "utf-8");
+    return fs.readFileSync(file, 'utf-8');
   } catch {
     return undefined;
   }
@@ -135,8 +138,8 @@ let eslint: ESLintInstance | undefined;
 
 const resolveESLint = (cwd: string): ESLintConstructor | undefined => {
   try {
-    const req = createRequire(path.join(cwd, "package.json"));
-    const eslintPath = req.resolve("eslint");
+    const req = createRequire(path.join(cwd, 'package.json'));
+    const eslintPath = req.resolve('eslint');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = req(eslintPath) as { ESLint?: ESLintConstructor };
     return mod.ESLint;
@@ -167,19 +170,22 @@ const enqueue = (task: () => Promise<void>): void => {
 
 // --- Command handlers ---
 
-const handleInitialize = async (seq: number, args: Record<string, unknown>): Promise<void> => {
+const handleInitialize = async (
+  seq: number,
+  args: Record<string, unknown>
+): Promise<void> => {
   const cwd = args.cwd as string;
 
   const ESLintClass = resolveESLint(cwd);
   if (!ESLintClass) {
-    sendError(seq, "ESLint not found in project");
-    sendEvent("status", { state: "error", detail: "ESLint not found" });
+    sendError(seq, 'ESLint not found in project');
+    sendEvent('status', { state: 'error', detail: 'ESLint not found' });
     return;
   }
 
   try {
     eslint = new ESLintClass({ cwd });
-    sendEvent("status", { state: "warming", detail: "loading config…" });
+    sendEvent('status', { state: 'warming', detail: 'loading config…' });
     sendResponse(seq, { eslintFound: true });
 
     // Warm up: lint a real file to force @typescript-eslint to build its
@@ -198,18 +204,18 @@ const handleInitialize = async (seq: number, args: Record<string, unknown>): Pro
       }
     } else {
       // No real file — lint empty content to at least load config + plugins
-      await eslint.lintText("", { filePath: path.join(cwd, "__warmup__.ts") });
+      await eslint.lintText('', { filePath: path.join(cwd, '__warmup__.ts') });
     }
 
-    sendEvent("status", {
-      state: "ready",
-      detail: `ESLint${warmupFile ? ` (${Date.now() - t0}ms)` : ""}`,
+    sendEvent('status', {
+      state: 'ready',
+      detail: `ESLint${warmupFile ? ` (${Date.now() - t0}ms)` : ''}`,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // Don't sendError here — the initialize response was already sent.
     // Status event is enough for the provider to know warmup failed.
-    sendEvent("status", { state: "error", detail: message });
+    sendEvent('status', { state: 'error', detail: message });
   }
 };
 
@@ -230,13 +236,16 @@ const handleClose = (args: Record<string, unknown>): void => {
   docClose(file);
 };
 
-const handleLint = async (seq: number, args: Record<string, unknown>): Promise<void> => {
+const handleLint = async (
+  seq: number,
+  args: Record<string, unknown>
+): Promise<void> => {
   const file = args.file as string;
   const explicitContent = args.content as string | undefined;
   const t0 = Date.now();
 
   if (!eslint) {
-    sendError(seq, "Not initialized", Date.now() - t0);
+    sendError(seq, 'Not initialized', Date.now() - t0);
     return;
   }
 
@@ -255,12 +264,15 @@ const handleLint = async (seq: number, args: Record<string, unknown>): Promise<v
   }
 };
 
-const handleLintFiles = async (seq: number, args: Record<string, unknown>): Promise<void> => {
+const handleLintFiles = async (
+  seq: number,
+  args: Record<string, unknown>
+): Promise<void> => {
   const files = args.files as string[];
   const t0 = Date.now();
 
   if (!eslint) {
-    sendError(seq, "Not initialized", Date.now() - t0);
+    sendError(seq, 'Not initialized', Date.now() - t0);
     return;
   }
 
@@ -282,7 +294,7 @@ type IncomingMessage = {
 };
 
 const handleMessage = (msg: IncomingMessage): void => {
-  if (msg.command === "shutdown") {
+  if (msg.command === 'shutdown') {
     documents.clear();
     process.exit(0);
   }
@@ -292,13 +304,13 @@ const handleMessage = (msg: IncomingMessage): void => {
   // Notifications (no seq)
   if (msg.seq === undefined) {
     switch (msg.command) {
-      case "open":
+      case 'open':
         handleOpen(args);
         return;
-      case "change":
+      case 'change':
         handleChange(args);
         return;
-      case "close":
+      case 'close':
         handleClose(args);
         return;
     }
@@ -308,13 +320,13 @@ const handleMessage = (msg: IncomingMessage): void => {
   // Requests (have seq → enqueue for serialized execution)
   const { seq } = msg;
   switch (msg.command) {
-    case "initialize":
+    case 'initialize':
       enqueue(() => handleInitialize(seq, args));
       break;
-    case "lint":
+    case 'lint':
       enqueue(() => handleLint(seq, args));
       break;
-    case "lintFiles":
+    case 'lintFiles':
       enqueue(() => handleLintFiles(seq, args));
       break;
     default:
@@ -322,6 +334,6 @@ const handleMessage = (msg: IncomingMessage): void => {
   }
 };
 
-parentPort!.on("message", (msg: IncomingMessage) => {
+parentPort!.on('message', (msg: IncomingMessage) => {
   handleMessage(msg);
 });

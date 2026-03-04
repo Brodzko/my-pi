@@ -103,6 +103,7 @@ When the user asks to "fix up" a commit, prefer `--fixup=<ref>` over amending un
 Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `release`, `hotfix`
 
 Examples:
+
 ```
 feat/PROJ-123-add-line-validation
 fix/PROJ-456-token-refresh-race
@@ -141,10 +142,12 @@ git rebase origin/main
 ```
 
 Before suggesting a rebase, tell the user:
+
 - How many commits will be replayed (`git log --oneline HEAD --not origin/main`)
 - Whether there are likely conflicts (`git diff --stat origin/main`)
 
 If conflicts occur during rebase, stop and report:
+
 - Which file(s) have conflicts
 - Which commit in the rebase sequence caused it
 - Suggest: "resolve conflicts, `git add <files>`, then `git rebase --continue`" — but let the user drive
@@ -182,6 +185,7 @@ git worktree add .brodzko/worktrees/<branch-short-name> -b <branch-name>
 ```
 
 Example:
+
 ```bash
 git worktree add .brodzko/worktrees/feat-parser -b feat/PROJ-123-add-parser
 ```
@@ -225,10 +229,10 @@ git worktree list
 
 ## Error handling summary
 
-| Situation | Action |
-|---|---|
-| Merge/rebase conflict | **Stop immediately.** Report conflicting files. Ask user. |
-| Unexpected non-zero exit | **Stop.** Report full error output. |
-| Dirty worktree blocks operation | Report dirty files. Suggest stash or commit. Ask user. |
-| Branch already exists | Report. Ask if user wants to switch to it or pick a different name. |
-| Detached HEAD | Report. Suggest creating a branch if work needs to be preserved. |
+| Situation                       | Action                                                              |
+| ------------------------------- | ------------------------------------------------------------------- |
+| Merge/rebase conflict           | **Stop immediately.** Report conflicting files. Ask user.           |
+| Unexpected non-zero exit        | **Stop.** Report full error output.                                 |
+| Dirty worktree blocks operation | Report dirty files. Suggest stash or commit. Ask user.              |
+| Branch already exists           | Report. Ask if user wants to switch to it or pick a different name. |
+| Detached HEAD                   | Report. Suggest creating a branch if work needs to be preserved.    |

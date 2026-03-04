@@ -11,7 +11,7 @@
 export type SyncEntry = {
   file: string;
   content: string | undefined;
-  command: "open" | "change";
+  command: 'open' | 'change';
 };
 
 export type SyncQueue = {
@@ -42,7 +42,7 @@ export const createSyncQueue = (): SyncQueue => {
     drain() {
       const entries: SyncEntry[] = [];
       for (const [file, content] of pending) {
-        entries.push({ file, content, command: "open" });
+        entries.push({ file, content, command: 'open' });
       }
       pending.clear();
       return entries;
