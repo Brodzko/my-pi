@@ -91,6 +91,9 @@ const renderStatus = (ctx: ExtensionContext): void => {
 
   const parts: string[] = [];
   for (const [id, { state, detail }] of providerStatuses) {
+    // Provider not available in this project — don't show anything
+    if (state === "error" && detail && /not found/i.test(detail)) continue;
+
     const icon = STATUS_ICONS[state] ?? "?";
     const label = id === "typescript" ? "TS" : id === "eslint" ? "ESLint" : id;
 
