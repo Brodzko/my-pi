@@ -40,6 +40,17 @@ RUN ARCH="$(dpkg --print-architecture)" \
 ARG PNPM_VERSION=9.15.4
 RUN npm i -g pnpm@${PNPM_VERSION}
 
+RUN echo "Hello" 
+
+# Install Quill
+RUN git clone https://github.com/Brodzko/quill.git /tmp/quill \
+  && cd /tmp/quill \
+  && npm ci \
+  && npm run build \
+  && npm i -g . --ignore-scripts --install-links \
+  && cd / \
+  && rm -rf /tmp/quill
+
 ENV NODE_OPTIONS="--disable-sigusr1 --max-old-space-size=8096"
 
 USER sandbox
