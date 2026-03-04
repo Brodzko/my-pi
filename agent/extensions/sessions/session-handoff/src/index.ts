@@ -375,7 +375,8 @@ const runHandoff = async (
 
     const prefill = composeHandoffPrefill(
       generated.handoffMarkdown,
-      optionalInstruction
+      optionalInstruction,
+      sourceSessionId
     );
 
     const newSessionResult = await ctx.newSession({
