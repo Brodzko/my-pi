@@ -1,6 +1,6 @@
-export type DiagnosticsProviderId = "typescript" | "eslint";
+export type DiagnosticsProviderId = 'typescript' | 'eslint';
 
-export type DiagnosticSeverity = "error" | "warning" | "info" | "hint";
+export type DiagnosticSeverity = 'error' | 'warning' | 'info' | 'hint';
 
 export type DiagnosticRange = {
   start: { line: number; character: number };
@@ -18,7 +18,7 @@ export type NormalizedDiagnostic = {
 };
 
 export type ProviderStatus = {
-  status: "ok" | "error" | "timeout" | "skipped";
+  status: 'ok' | 'error' | 'timeout' | 'skipped';
   timingMs: number;
   message?: string;
 };

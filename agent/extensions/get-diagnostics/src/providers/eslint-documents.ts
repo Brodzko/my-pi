@@ -6,7 +6,7 @@
  *
  * Content priority: tracked document content → disk fallback.
  */
-import * as fs from "node:fs";
+import * as fs from 'node:fs';
 
 export type DocumentStore = {
   /** Track a file. Reads from disk if no content provided. */
@@ -30,7 +30,7 @@ export const createDocumentStore = (): DocumentStore => {
 
   const readFromDisk = (file: string): string | undefined => {
     try {
-      return fs.readFileSync(file, "utf-8");
+      return fs.readFileSync(file, 'utf-8');
     } catch {
       return undefined;
     }

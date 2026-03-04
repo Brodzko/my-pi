@@ -1,9 +1,9 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { loadConfig, type DebugLevel } from "./config";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { loadConfig, type DebugLevel } from './config';
 
-const LOG_DIR = ".brodzko/logs";
-const LOG_FILE = "get-diagnostics.log";
+const LOG_DIR = '.brodzko/logs';
+const LOG_FILE = 'get-diagnostics.log';
 
 /** Higher number = more verbose. "off" = nothing written. */
 const LEVEL_RANK: Record<DebugLevel, number> = {
@@ -21,16 +21,20 @@ const LEVEL_RANK: Record<DebugLevel, number> = {
  */
 const inferLevel = (source: string, message: string): DebugLevel => {
   const lower = message.toLowerCase();
-  if (lower.includes("error") || lower.includes("timeout") || lower.includes("rejected"))
-    return "error";
   if (
-    lower.includes("resolve") ||
-    lower.includes("glob") ||
-    lower.includes("prewarm") ||
-    lower.includes("sync")
+    lower.includes('error') ||
+    lower.includes('timeout') ||
+    lower.includes('rejected')
   )
-    return "verbose";
-  return "info";
+    return 'error';
+  if (
+    lower.includes('resolve') ||
+    lower.includes('glob') ||
+    lower.includes('prewarm') ||
+    lower.includes('sync')
+  )
+    return 'verbose';
+  return 'info';
 };
 
 let stream: fs.WriteStream | undefined;
@@ -45,7 +49,11 @@ const getLevel = (): DebugLevel => {
 
 const timestamp = (): string => new Date().toISOString().slice(11, 23);
 
-const formatLine = (source: string, message: string, data?: Record<string, unknown>): string =>
+const formatLine = (
+  source: string,
+  message: string,
+  data?: Record<string, unknown>
+): string =>
   data
     ? `[${timestamp()}] [${source}] ${message} ${JSON.stringify(data)}`
     : `[${timestamp()}] [${source}] ${message}`;
@@ -59,7 +67,7 @@ export const initLog = (cwd: string): void => {
   if (initialized) return;
 
   const level = getLevel();
-  if (level === "off") {
+  if (level === 'off') {
     buffer = [];
     initialized = true;
     return;
@@ -69,19 +77,23 @@ export const initLog = (cwd: string): void => {
   fs.mkdirSync(logDir, { recursive: true });
 
   const logPath = path.join(logDir, LOG_FILE);
-  stream = fs.createWriteStream(logPath, { flags: "w" });
+  stream = fs.createWriteStream(logPath, { flags: 'w' });
   initialized = true;
 
   // Flush buffered messages
   for (const line of buffer) {
-    stream.write(line + "\n");
+    stream.write(line + '\n');
   }
   buffer = [];
 };
 
-export const log = (source: string, message: string, data?: Record<string, unknown>): void => {
+export const log = (
+  source: string,
+  message: string,
+  data?: Record<string, unknown>
+): void => {
   const level = getLevel();
-  if (level === "off") return;
+  if (level === 'off') return;
 
   const msgLevel = inferLevel(source, message);
   if (LEVEL_RANK[msgLevel] > LEVEL_RANK[level]) return;
@@ -94,7 +106,7 @@ export const log = (source: string, message: string, data?: Record<string, unkno
     return;
   }
 
-  stream?.write(line + "\n");
+  stream?.write(line + '\n');
 };
 
 export const closeLog = (): void => {

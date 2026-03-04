@@ -4,6 +4,7 @@ Capture recurring mistakes that should be avoided.
 Only include patterns likely to recur.
 
 ## Entry Template
+
 - ID: AP-YYYYMMDD-XX
 - Level: L1 (policy) | L2 (tactic)
 - Tags: [area, package, API, error-type]

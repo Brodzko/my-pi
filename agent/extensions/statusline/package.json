@@ -4,7 +4,7 @@
   "private": true,
   "description": "Custom status line for pi — editor border info + context usage footer",
   "scripts": {
-    "format": "node -e \"console.log('statusline: no local formatter configured')\"",
+    "format": "prettier --write .",
     "lint": "tsc --noEmit",
     "tsc": "tsc --noEmit",
     "test": "node --test"
@@ -12,6 +12,7 @@
   "devDependencies": {
     "@mariozechner/pi-coding-agent": "^0.52.12",
     "@types/node": "^22.0.0",
+    "prettier": "3.8.1",
     "typescript": "^5.7.0"
   },
   "pi": {

@@ -6,19 +6,19 @@
 
 #### MAT (my team)
 
-| Name               | Handle                |
-| ------------------ | --------------------- |
-| Martin Brodziansky | @martin.brodziansky   |
-| Jan Marsicek       | @jan.marsicek         |
-| Jan Pfajfr         | @jan.pfajfr           |
-| Serhan Guney       | @serhan.guney         |
+| Name               | Handle              |
+| ------------------ | ------------------- |
+| Martin Brodziansky | @martin.brodziansky |
+| Jan Marsicek       | @jan.marsicek       |
+| Jan Pfajfr         | @jan.pfajfr         |
+| Serhan Guney       | @serhan.guney       |
 
 #### PAT
 
-| Name           | Handle            |
-| -------------- | ----------------- |
-| Pavel Sury     | @pavel.sury       |
-| Ondrej Matejka | @ondrej.matejka   |
+| Name           | Handle          |
+| -------------- | --------------- |
+| Pavel Sury     | @pavel.sury     |
+| Ondrej Matejka | @ondrej.matejka |
 
 ### MR conventions
 

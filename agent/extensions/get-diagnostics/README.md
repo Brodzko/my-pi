@@ -90,20 +90,22 @@ src/providers/my-lang.ts
 Implement `DiagnosticsProvider`:
 
 ```ts
-import * as path from "node:path";
-import type { NormalizedDiagnostic } from "../types.js";
-import type { DiagnosticsProvider, ProviderParams } from "./types.js";
+import * as path from 'node:path';
+import type { NormalizedDiagnostic } from '../types.js';
+import type { DiagnosticsProvider, ProviderParams } from './types.js';
 
 export const createMyLangProvider = (): DiagnosticsProvider => {
-  const supportedExtensions = ["json", "yaml", "yml"] as const;
-  const extPattern = new RegExp(`\\.(${supportedExtensions.join("|")})$`);
+  const supportedExtensions = ['json', 'yaml', 'yml'] as const;
+  const extPattern = new RegExp(`\\.(${supportedExtensions.join('|')})$`);
 
   return {
-    id: "my-lang",
+    id: 'my-lang',
     supportedExtensions,
-    isFileSupported: (filePath) => extPattern.test(filePath),
+    isFileSupported: filePath => extPattern.test(filePath),
 
-    async getDiagnostics(params: ProviderParams): Promise<NormalizedDiagnostic[]> {
+    async getDiagnostics(
+      params: ProviderParams
+    ): Promise<NormalizedDiagnostic[]> {
       // 1. Resolve the language server / linter from the project
       //    (use createRequire(cwd) to find the project's installation)
       //
@@ -138,11 +140,15 @@ export const createMyLangProvider = (): DiagnosticsProvider => {
 ### 2. Register in `extension.ts`
 
 ```ts
-import { createMyLangProvider } from "./providers/my-lang.js";
+import { createMyLangProvider } from './providers/my-lang.js';
 
 // In setup():
 const myLangProvider = createMyLangProvider();
-const service = createDiagnosticsService([tsProvider, eslintProvider, myLangProvider]);
+const service = createDiagnosticsService([
+  tsProvider,
+  eslintProvider,
+  myLangProvider,
+]);
 ```
 
 ### 3. Update render order (optional)
@@ -154,7 +160,7 @@ in output:
 const PROVIDER_ORDER: Record<string, number> = {
   typescript: 0,
   eslint: 1,
-  "my-lang": 2,
+  'my-lang': 2,
 };
 ```
 

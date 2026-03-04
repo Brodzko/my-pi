@@ -32,11 +32,19 @@ const windowUsedPercent = (window: WindowUsage): number | null => {
     return Math.max(0, Math.min(100, window.usedPercent));
   }
 
-  if (window.used !== undefined && window.limit !== undefined && window.limit > 0) {
+  if (
+    window.used !== undefined &&
+    window.limit !== undefined &&
+    window.limit > 0
+  ) {
     return Math.max(0, Math.min(100, (window.used / window.limit) * 100));
   }
 
-  if (window.remaining !== undefined && window.limit !== undefined && window.limit > 0) {
+  if (
+    window.remaining !== undefined &&
+    window.limit !== undefined &&
+    window.limit > 0
+  ) {
     const usedFromRemaining = window.limit - window.remaining;
     return Math.max(0, Math.min(100, (usedFromRemaining / window.limit) * 100));
   }
@@ -57,7 +65,10 @@ const formatResetIn = (window: WindowUsage): string | null => {
   return `${Math.max(1, minutes)}m`;
 };
 
-const renderSemaphoreBar = (remainingPercent: number, theme: ThemeFg): string => {
+const renderSemaphoreBar = (
+  remainingPercent: number,
+  theme: ThemeFg
+): string => {
   const filled = Math.round((remainingPercent / 100) * PROGRESS_WIDTH);
   const empty = PROGRESS_WIDTH - filled;
 
@@ -68,7 +79,9 @@ const renderSemaphoreBar = (remainingPercent: number, theme: ThemeFg): string =>
         ? 'warning'
         : 'error';
 
-  return theme.fg(color, '▰'.repeat(filled)) + theme.fg('dim', '▱'.repeat(empty));
+  return (
+    theme.fg(color, '▰'.repeat(filled)) + theme.fg('dim', '▱'.repeat(empty))
+  );
 };
 
 const renderWindowSegment = (
@@ -104,15 +117,28 @@ const renderEntryLine = (
   theme: ThemeFg,
   width: number
 ): string => {
-  const coloredProvider = providerColorize(entry.provider, providerLabel(entry.provider));
+  const coloredProvider = providerColorize(
+    entry.provider,
+    providerLabel(entry.provider)
+  );
 
   if (!entry.usage) {
-    return truncateToWidth(`${coloredProvider} ${theme.fg('dim', 'unavailable')}`, width);
+    return truncateToWidth(
+      `${coloredProvider} ${theme.fg('dim', 'unavailable')}`,
+      width
+    );
   }
 
-  const windowsByKey = new Map(entry.usage.windows.map(window => [window.key, window]));
+  const windowsByKey = new Map(
+    entry.usage.windows.map(window => [window.key, window])
+  );
   const segments = windowOrder.map(windowKey =>
-    renderWindowSegment(entry.provider, windowKey, windowsByKey.get(windowKey), theme)
+    renderWindowSegment(
+      entry.provider,
+      windowKey,
+      windowsByKey.get(windowKey),
+      theme
+    )
   );
 
   return truncateToWidth(
@@ -129,7 +155,9 @@ export const renderSubscriptionLines = (
 ): string[] => {
   if (!entries && !isLoading) return [];
   if (!entries && isLoading) {
-    return [truncateToWidth(theme.fg('dim', 'subscription usage loading…'), width)];
+    return [
+      truncateToWidth(theme.fg('dim', 'subscription usage loading…'), width),
+    ];
   }
 
   const resolvedEntries = entries ?? [];
