@@ -25,18 +25,26 @@ import { createLsResultComponent } from './ls-render';
 
 type ReadArgs = { path: string; offset?: number; limit?: number };
 
+const skillNameFromPath = (path: string | undefined): string | undefined => {
+  if (!path) return undefined;
+  const match = path.match(/\/skills\/([^/]+)\/SKILL\.md$/);
+  return match?.[1];
+};
+
 export const readConfig: MinimalToolConfig<ReadArgs, ReadToolDetails> = {
   icon: '📖',
   target: (args, theme) => {
-    const name =
-      theme.bold('read') + ' ' + pathColor(theme, basename(args.path));
+    const skillName = skillNameFromPath(args.path);
+    const label = skillName
+      ? theme.bold('read') + ' ' + theme.fg('mdHeading', `skill:${skillName}`)
+      : theme.bold('read') + ' ' + pathColor(theme, basename(args.path));
     if (args.offset && args.limit)
-      return `${name}${theme.fg('mdHeading', `:${args.offset}-${args.offset + args.limit - 1}`)}`;
+      return `${label}${theme.fg('mdHeading', `:${args.offset}-${args.offset + args.limit - 1}`)}`;
     if (args.offset)
-      return `${name}${theme.fg('mdHeading', `:${args.offset}-`)}`;
+      return `${label}${theme.fg('mdHeading', `:${args.offset}-`)}`;
     if (args.limit)
-      return `${name}${theme.fg('mdHeading', `:1-${args.limit}`)}`;
-    return name;
+      return `${label}${theme.fg('mdHeading', `:1-${args.limit}`)}`;
+    return label;
   },
   meta: result => {
     const truncation = result.details?.truncation;
