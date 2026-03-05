@@ -52,6 +52,20 @@ Proposed commits (in order):
    Why: Tests for the new feature
 ```
 
+### Pre-commit review offer
+
+When the `code-review` skill is active, offer a diff review after presenting the
+commit plan and before executing commits:
+
+> Want to review the diff before I commit?
+
+- If the user accepts, hand off to the code-review pre-commit gate (entry point
+  5 in that skill). Only proceed with the commit after all files are approved.
+- If the user declines, proceed with the commit immediately.
+- If the user says "just commit", skip the offer entirely — same as declining.
+
+This is a lightweight prompt, not an automatic gate. The user opts in per commit.
+
 ### Partial staging
 
 When two planned commits both touch the same file, flag it in the plan:
