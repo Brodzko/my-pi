@@ -111,7 +111,7 @@ export const noteCreateLineCommand = defineCommand({
 
       // 1. Get diff versions to resolve SHAs
       const versions = await execGlabJson(
-        ['api', 'GET', `/projects/${projectId}/merge_requests/${iid}/versions`],
+        ['api', `/projects/${projectId}/merge_requests/${iid}/versions`],
         data => data as DiffVersion[]
       );
       const latest = versions[0];
@@ -124,7 +124,7 @@ export const noteCreateLineCommand = defineCommand({
 
       // 2. Get MR changes to find the file and validate line
       const mrChanges = await execGlabJson(
-        ['api', 'GET', `/projects/${projectId}/merge_requests/${iid}/changes`],
+        ['api', `/projects/${projectId}/merge_requests/${iid}/changes`],
         data => data as { changes: DiffFile[] }
       );
 

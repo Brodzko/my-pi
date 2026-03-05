@@ -42,7 +42,7 @@ const executeAction = async (
 
     case 'line_comment': {
       const versions = await execGlabJson(
-        ['api', 'GET', `/projects/${projectId}/merge_requests/${iid}/versions`],
+        ['api', `/projects/${projectId}/merge_requests/${iid}/versions`],
         data =>
           data as {
             base_commit_sha: string;
@@ -55,7 +55,7 @@ const executeAction = async (
         throw new GlError(ErrorCode.UPSTREAM_ERROR, 'No diff versions found');
 
       const mrChanges = await execGlabJson(
-        ['api', 'GET', `/projects/${projectId}/merge_requests/${iid}/changes`],
+        ['api', `/projects/${projectId}/merge_requests/${iid}/changes`],
         data =>
           data as {
             changes: {
@@ -240,7 +240,7 @@ export const reviewSubmitCommand = defineCommand({
         review.strictChecks.requireNoUnresolvedDiscussions
       ) {
         const mrRaw = await execGlabJson(
-          ['api', 'GET', `/projects/${projectId}/merge_requests/${iid}`],
+          ['api', `/projects/${projectId}/merge_requests/${iid}`],
           data =>
             data as {
               draft: boolean;
