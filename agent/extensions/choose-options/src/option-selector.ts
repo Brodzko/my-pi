@@ -93,6 +93,12 @@ export const openOptionSelector = async (
 
         if (matchesKey(data, Key.enter)) {
           if (request.multi) {
+            if (selectedIds.size === 0) {
+              const option = request.options[cursor];
+              if (option) {
+                selectedIds.add(option.id);
+              }
+            }
             submit();
           } else {
             selectCurrentSingle();
