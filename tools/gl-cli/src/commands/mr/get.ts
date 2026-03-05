@@ -96,7 +96,6 @@ export const getCommand = defineCommand({
         const raw = await execGlabJson(
           [
             'api',
-            'GET',
             `/projects/${projectId}/merge_requests/${iid}/changes`,
           ],
           data => data as { changes: unknown[] }
@@ -110,7 +109,6 @@ export const getCommand = defineCommand({
         const raw = await execGlabJson(
           [
             'api',
-            'GET',
             `/projects/${projectId}/merge_requests/${iid}/discussions`,
           ],
           data => data as unknown[]
@@ -127,7 +125,6 @@ export const getCommand = defineCommand({
           const raw = await execGlabJson(
             [
               'api',
-              'GET',
               `/projects/${projectId}/merge_requests/${iid}/pipelines`,
               '--per-page',
               '1',
@@ -153,7 +150,6 @@ export const getCommand = defineCommand({
         const raw = await execGlabJson(
           [
             'api',
-            'GET',
             `/projects/${projectId}/merge_requests/${iid}/approvals`,
           ],
           data =>
