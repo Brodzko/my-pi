@@ -318,12 +318,105 @@ GitLab comments to post on !42:
 5. If the review is clean (no comments to post), offer to approve the MR
    with `gl mr approve`.
 
+## Reviewer Preferences
+
+Learned reviewer preferences are stored in `REVIEWER.md` (co-located with this
+skill file). This system captures review patterns over time and uses them to
+provide better, more personalized reviews.
+
+### Before every review session
+
+1. **Load preferences.** Read `REVIEWER.md` from this skill's directory.
+2. **Apply preferences to annotation generation.** When preparing annotations
+   for any entry point (agent work, full review, MR review, etc.), check the
+   code against known preferences. If a preference matches, generate an
+   anticipated annotation with a note like `[matches pref-<id>]` in the
+   annotation text so the reviewer can see it's preference-driven.
+3. **Prioritize high-confidence preferences.** Always generate annotations for
+   `high` confidence preferences. For `medium`, include them. For `low`, include
+   only if the match is strong.
+
+### After every review session (during synthesis)
+
+After the review walk completes and session synthesis is done, run a
+**preference discovery pass:**
+
+1. **Scan user annotations.** Look at all `source: "user"` annotations and
+   discussion from denied files. Identify patterns:
+   - Repeated feedback themes (same comment on multiple files)
+   - Style/naming corrections
+   - Structural preferences (file organization, abstraction boundaries)
+   - Pattern preferences (what they like vs. what they flag)
+   - Things they praised (positive preferences)
+2. **Diff against existing preferences.** Check if the observed patterns are
+   already captured in `REVIEWER.md`.
+3. **If new preferences are found:**
+   - Present each candidate preference clearly, using the format from
+     `REVIEWER.md` (ID, category, scope, description, example).
+   - Ask: _"I noticed these review preferences — want me to save them?"_
+   - Use `choose_options` with multi-select if there are multiple candidates.
+   - For approved preferences, append them to the `## Preferences` section
+     of `REVIEWER.md`.
+4. **If existing preferences are reinforced** (user gave feedback matching an
+   existing preference):
+   - Bump `confidence` if appropriate (`low` → `medium` → `high`).
+   - Update `Last seen` date.
+   - Do this silently — no need to ask for confirmation on reinforcement.
+5. **Promotion suggestions.** When a preference reaches `high` confidence and
+   has scope `global` or `frontend`, suggest lifting it to the appropriate
+   `AGENTS.md`. Do not do this automatically — just mention it during synthesis.
+
+### Preference hygiene
+
+`REVIEWER.md` must stay lean and scannable. Target: **≤ 30 active preferences.**
+
+1. **Merge over create.** Before adding a new preference, check if an existing
+   one covers the same concern. If so, update the existing entry (broaden the
+   description, add a second example, bump confidence) instead of creating a
+   near-duplicate.
+2. **Retire stale preferences.** During preference loading (before a session),
+   scan `Last seen` dates. If a preference has not been reinforced in 90+ days
+   and is still `low` confidence, move it to the `## Retired` section at the
+   bottom of `REVIEWER.md` (don't delete — it may resurface).
+3. **Promote to graduate.** Once a preference is promoted to an `AGENTS.md`
+   file, remove it from the active list and add a one-line entry to the
+   `## Promoted` section noting where it went (e.g.
+   `pref-handler-naming → ~/.pi/agent/AGENTS.md § Code Style`).
+4. **Consolidate related preferences.** If 3+ preferences share a category and
+   overlap significantly, consolidate them into a single broader preference.
+   Preserve the highest confidence and earliest discovery date.
+5. **Cap examples.** Each preference gets at most 2 short examples. Replace
+   older examples only if a newer one is clearer.
+
+### Preference structure (for liftability)
+
+Preferences in `REVIEWER.md` are deliberately structured to be inspectable and
+liftable:
+
+- **Global scope** preferences can be promoted to `~/.pi/agent/AGENTS.md`
+  (Code Style, Patterns I Value, Patterns to Avoid sections).
+- **Frontend scope** preferences can be promoted to project-level `AGENTS.md`
+  files.
+- **Project-specific** preferences stay in `REVIEWER.md` but reference the
+  project they apply to.
+- **Personal** preferences (subjective taste) stay in `REVIEWER.md` permanently.
+
+When suggesting a promotion, show the exact text that would be added to the
+target file so the user can approve it.
+
 ## Rules
 
 - **Always create the session file.** At the start of every multi-file review,
   create the session file at `/tmp/pi-review-sessions/`. Update it after each
   file's Quill output. This is not optional — the session file must exist and
   be current throughout the walk, not reconstructed after the fact.
+- **Always load reviewer preferences.** Before entering any review loop, read
+  `REVIEWER.md` from this skill's directory. If the file doesn't exist, create
+  it from the template. Preference loading is not optional.
+- **Always run preference discovery.** After every multi-file review session,
+  run the preference discovery pass described in § Reviewer Preferences. For
+  single-file ad-hoc inspections, only run discovery if the user provided
+  substantive feedback (annotations or discussion).
 - **Never open Quill spontaneously.** Only enter the review loop when explicitly
   triggered by the user or by another skill's documented integration point (e.g.
   archivist pre-commit gate).
