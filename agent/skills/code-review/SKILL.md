@@ -140,6 +140,14 @@ The main protocol. All entry points converge here.
 initialize session file
 compute ordered file list
 
+present overview:
+  show file list with ordering rationale, entry point context, and any
+  high-level observations about the changeset
+  then ask the user to confirm before starting the walk:
+    use choose_options with "Start review?" → yes / no
+    if no → end walk, go to synthesis with nothing reviewed
+    if yes → proceed to file walk
+
 for each file in list:
   open in quill (with annotations, diff mode as appropriate)
   read quill output → decision + annotations

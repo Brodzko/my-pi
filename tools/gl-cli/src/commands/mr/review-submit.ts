@@ -1,5 +1,8 @@
 import { defineCommand } from 'citty';
 import { readFile } from 'node:fs/promises';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ReviewSchema, type ReviewAction } from '../../schemas/review.js';
 import { ensureAuth } from '../../lib/auth.js';
 import { execGlab, execGlabJson } from '../../lib/exec.js';
@@ -76,31 +79,42 @@ const executeAction = async (
         );
       }
 
-      const result = await execGlabJson(
-        [
-          'api',
-          'POST',
-          `/projects/${projectId}/merge_requests/${iid}/discussions`,
-          '-f',
-          `body=${action.body}`,
-          '-f',
-          `position[position_type]=text`,
-          '-f',
-          `position[base_sha]=${latest.base_commit_sha}`,
-          '-f',
-          `position[start_sha]=${latest.start_commit_sha}`,
-          '-f',
-          `position[head_sha]=${latest.head_commit_sha}`,
-          '-f',
-          `position[old_path]=${fileChange.old_path}`,
-          '-f',
-          `position[new_path]=${fileChange.new_path}`,
+      const requestBody = {
+        body: action.body,
+        position: {
+          position_type: 'text',
+          base_sha: latest.base_commit_sha,
+          start_sha: latest.start_commit_sha,
+          head_sha: latest.head_commit_sha,
+          old_path: fileChange.old_path,
+          new_path: fileChange.new_path,
           ...(action.lineType === 'new'
-            ? ['-f', `position[new_line]=${action.line}`]
-            : ['-f', `position[old_line]=${action.line}`]),
-        ],
-        data => data as { id: string; notes: { id: number }[] }
-      );
+            ? { new_line: action.line }
+            : { old_line: action.line }),
+        },
+      };
+
+      const tmpFile = join(tmpdir(), `gl-review-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+      writeFileSync(tmpFile, JSON.stringify(requestBody));
+
+      let result: { id: string; notes: { id: number }[] };
+      try {
+        result = await execGlabJson(
+          [
+            'api',
+            `/projects/${projectId}/merge_requests/${iid}/discussions`,
+            '-X',
+            'POST',
+            '-H',
+            'Content-Type: application/json',
+            '--input',
+            tmpFile,
+          ],
+          data => data as { id: string; notes: { id: number }[] }
+        );
+      } finally {
+        try { unlinkSync(tmpFile); } catch {}
+      }
       return { discussionId: result.id, id: result.notes[0]?.id };
     }
 
@@ -108,8 +122,9 @@ const executeAction = async (
       const result = await execGlabJson(
         [
           'api',
-          'POST',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${action.discussionId}/notes`,
+          '-X',
+          'POST',
           '-f',
           `body=${action.body}`,
         ],
@@ -122,8 +137,9 @@ const executeAction = async (
       await execGlabJson(
         [
           'api',
-          'PUT',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${action.discussionId}`,
+          '-X',
+          'PUT',
           '-f',
           'resolved=true',
         ],
@@ -136,8 +152,9 @@ const executeAction = async (
       await execGlabJson(
         [
           'api',
-          'PUT',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${action.discussionId}`,
+          '-X',
+          'PUT',
           '-f',
           'resolved=false',
         ],

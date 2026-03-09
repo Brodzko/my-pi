@@ -8,7 +8,8 @@
     "openai-codex/gpt-5.3-codex",
     "openai-codex/gpt-5.2-codex",
     "anthropic/claude-opus-4-6",
-    "anthropic/claude-sonnet-4-6"
+    "anthropic/claude-sonnet-4-6",
+    "openai-codex/gpt-5.4"
   ],
   "hideThinkingBlock": true,
   "defaultThinkingLevel": "medium",
