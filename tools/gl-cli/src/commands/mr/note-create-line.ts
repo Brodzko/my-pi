@@ -1,3 +1,6 @@
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineCommand } from 'citty';
 import { z } from 'zod';
 import { ensureAuth } from '../../lib/auth.js';
@@ -170,32 +173,43 @@ export const noteCreateLineCommand = defineCommand({
         return;
       }
 
-      // 4. Create discussion with position
-      const result = await execGlabJson(
-        [
-          'api',
-          'POST',
-          `/projects/${projectId}/merge_requests/${iid}/discussions`,
-          '-f',
-          `body=${body}`,
-          '-f',
-          `position[position_type]=text`,
-          '-f',
-          `position[base_sha]=${latest.base_commit_sha}`,
-          '-f',
-          `position[start_sha]=${latest.start_commit_sha}`,
-          '-f',
-          `position[head_sha]=${latest.head_commit_sha}`,
-          '-f',
-          `position[old_path]=${fileChange.old_path}`,
-          '-f',
-          `position[new_path]=${fileChange.new_path}`,
+      // 4. Create discussion with position via JSON body
+      const requestBody = {
+        body,
+        position: {
+          position_type: 'text',
+          base_sha: latest.base_commit_sha,
+          start_sha: latest.start_commit_sha,
+          head_sha: latest.head_commit_sha,
+          old_path: fileChange.old_path,
+          new_path: fileChange.new_path,
           ...(lineType === 'new'
-            ? ['-f', `position[new_line]=${line}`]
-            : ['-f', `position[old_line]=${line}`]),
-        ],
-        data => data as { id: string; notes: { id: number }[] }
-      );
+            ? { new_line: line }
+            : { old_line: line }),
+        },
+      };
+
+      const tmpFile = join(tmpdir(), `gl-note-${Date.now()}.json`);
+      writeFileSync(tmpFile, JSON.stringify(requestBody));
+
+      let result: { id: string; notes: { id: number }[] };
+      try {
+        result = await execGlabJson(
+          [
+            'api',
+            `/projects/${projectId}/merge_requests/${iid}/discussions`,
+            '-X',
+            'POST',
+            '-H',
+            'Content-Type: application/json',
+            '--input',
+            tmpFile,
+          ],
+          data => data as { id: string; notes: { id: number }[] }
+        );
+      } finally {
+        try { unlinkSync(tmpFile); } catch {}
+      }
 
       outputJson(
         success({

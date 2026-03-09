@@ -76,8 +76,9 @@ export const discussionReplyCommand = defineCommand({
       const result = await execGlabJson(
         [
           'api',
-          'POST',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${discussionId}/notes`,
+          '-X',
+          'POST',
           '-f',
           `body=${body}`,
         ],
@@ -157,8 +158,9 @@ export const discussionResolveCommand = defineCommand({
       await execGlabJson(
         [
           'api',
-          'PUT',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${discussionId}`,
+          '-X',
+          'PUT',
           '-f',
           'resolved=true',
         ],
@@ -230,8 +232,9 @@ export const discussionUnresolveCommand = defineCommand({
       await execGlabJson(
         [
           'api',
-          'PUT',
           `/projects/${projectId}/merge_requests/${iid}/discussions/${discussionId}`,
+          '-X',
+          'PUT',
           '-f',
           'resolved=false',
         ],
