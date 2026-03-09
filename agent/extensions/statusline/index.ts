@@ -12,6 +12,7 @@ export default (pi: ExtensionAPI) => {
   let currentCtx: ExtensionContext | null = null;
   let cachedGitStatus: GitStatus = { ...EMPTY_GIT_STATUS };
   let isTurnOngoing = false;
+  let footer: ReturnType<typeof createFooter> | null = null;
 
   const refreshGitStatus = async () => {
     const next = await fetchGitStatus(pi);
@@ -50,7 +51,7 @@ export default (pi: ExtensionAPI) => {
     });
 
     ctx.ui.setFooter((tui, theme, footerData) => {
-      const footer = createFooter(
+      footer = createFooter(
         tui,
         theme,
         footerData,
@@ -81,6 +82,7 @@ export default (pi: ExtensionAPI) => {
     isTurnOngoing = false;
     await refreshGitStatus();
     refreshEditor();
+    footer?.refreshUsage();
   });
 
   pi.on('agent_end', async (_event, ctx) => {
@@ -99,5 +101,6 @@ export default (pi: ExtensionAPI) => {
     isTurnOngoing = false;
     await refreshGitStatus();
     refreshEditor();
+    footer?.refreshUsage();
   });
 };

@@ -27,7 +27,8 @@ type FooterDeps = {
   isTurnOngoing: () => boolean;
 };
 
-const subscriptionRefreshMs = 60_000;
+const SUBSCRIPTION_COOLDOWN_MS = 2 * 60_000;
+const SUBSCRIPTION_MAX_BACKOFF_MS = 15 * 60_000;
 const TURN_SPINNER_INTERVAL_MS = 100;
 const TURN_SPINNER_FRAMES = [
   '⠋',
@@ -58,6 +59,7 @@ export const createFooter = (
   let subscriptionEntries: SubscriptionUsageEntry[] | null = null;
   let lastSubscriptionFetchAt = 0;
   let isSubscriptionLoading = false;
+  let subscriptionCooldownMs = SUBSCRIPTION_COOLDOWN_MS;
   let lastActiveUsageProvider: ProviderId | null = null;
   let turnSpinnerTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -79,8 +81,12 @@ export const createFooter = (
     }, TURN_SPINNER_INTERVAL_MS);
   };
 
-  const refreshSubscriptionSummary = async () => {
+  const refreshSubscriptionUsage = async (force = false) => {
     if (isSubscriptionLoading) return;
+
+    if (!force && Date.now() - lastSubscriptionFetchAt < subscriptionCooldownMs)
+      return;
+
     isSubscriptionLoading = true;
 
     try {
@@ -91,14 +97,28 @@ export const createFooter = (
         subscriptionEntries = null;
         lastActiveUsageProvider = null;
         lastSubscriptionFetchAt = Date.now();
+        subscriptionCooldownMs = SUBSCRIPTION_COOLDOWN_MS;
         tui.requestRender();
         return;
       }
 
-      subscriptionEntries = await fetchSubscriptionUsageEntries(
+      const entries = await fetchSubscriptionUsageEntries(
         deps.ctx,
         activeUsageProvider
       );
+
+      const hasUsableData = entries?.some(e => e.usage !== null) ?? false;
+
+      if (hasUsableData) {
+        subscriptionCooldownMs = SUBSCRIPTION_COOLDOWN_MS;
+      } else {
+        subscriptionCooldownMs = Math.min(
+          subscriptionCooldownMs * 2,
+          SUBSCRIPTION_MAX_BACKOFF_MS
+        );
+      }
+
+      subscriptionEntries = entries;
       lastActiveUsageProvider = activeUsageProvider;
       lastSubscriptionFetchAt = Date.now();
       tui.requestRender();
@@ -107,7 +127,8 @@ export const createFooter = (
     }
   };
 
-  void refreshSubscriptionSummary();
+  // Initial fetch on session start
+  void refreshSubscriptionUsage(true);
 
   return {
     dispose: () => {
@@ -115,6 +136,7 @@ export const createFooter = (
       unsub();
     },
     invalidate() {},
+    refreshUsage: () => void refreshSubscriptionUsage(),
     render(width: number): string[] {
       const info = deps.buildEditorInfo(deps.ctx);
       const editor = deps.getEditor();
@@ -135,14 +157,8 @@ export const createFooter = (
       if (providerChanged && !isSubscriptionLoading) {
         subscriptionEntries = null;
         lastSubscriptionFetchAt = 0;
-        void refreshSubscriptionSummary();
-      }
-
-      if (
-        !isSubscriptionLoading &&
-        Date.now() - lastSubscriptionFetchAt >= subscriptionRefreshMs
-      ) {
-        void refreshSubscriptionSummary();
+        subscriptionCooldownMs = SUBSCRIPTION_COOLDOWN_MS;
+        void refreshSubscriptionUsage(true);
       }
 
       ensureTurnSpinner();
