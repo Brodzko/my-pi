@@ -18,19 +18,57 @@ Use `git` directly for all operations. No wrapper needed.
 
 ### When to commit
 
-**Do not commit during work.** Complete the full task first, let the user review the diff, then propose commits.
+Prefer **incremental commits during work** over one big commit at the end.
+Proactively identify natural checkpoint moments and suggest them.
 
-The flow:
+#### Checkpoint suggestions (proactive)
 
-1. Do all work — edit files, run checks, iterate until done.
-2. When finished, summarize what changed and why.
-3. The user reviews the full diff (`git diff`).
-4. Propose a **commit plan** — an ordered list of self-contained commits, each with:
+While working, watch for natural commit boundaries — moments where a coherent,
+self-contained unit of work is complete. When you spot one, pause and suggest:
+
+> **Commit checkpoint:** This looks like a good place to commit.
+>
+> **Stage:** `src/lib/validate.ts`, `src/parser.ts`
+> **Message:** `refactor(parser): extract validation into shared helper`
+> **Rationale:** Pure refactor complete, no behavior change. Clean boundary
+> before building the next piece on top.
+>
+> Want to review and commit, or continue working?
+
+Good checkpoint signals:
+- A pure refactor is done before building new behavior on top
+- A new module/file is complete and passes checks
+- Tests are green after a meaningful change
+- A dependency upgrade is done and verified before touching consuming code
+- Moving from one logical concern to another (e.g. types → implementation → tests)
+
+**Do not over-suggest.** One checkpoint per logical boundary, not after every
+file edit. If the task is small (< 5 files, single concern), it's fine to
+propose a single commit at the end instead.
+
+When the user responds:
+- **"yes" / "commit" / approves** → proceed to staging and commit (with
+  pre-commit review offer if code-review skill is active).
+- **"continue" / "not yet" / "later"** → note the suggested boundary and keep
+  working. At the end, use these noted boundaries to structure the final commit
+  plan.
+- **"just commit at the end"** → stop suggesting checkpoints for this task.
+  Propose commits only when all work is done.
+
+#### End-of-task commit plan
+
+When the task is complete (or the user asks to commit), propose a **commit
+plan** — an ordered list of self-contained commits:
+
+1. Summarize what changed and why.
+2. Propose commits, each with:
    - A conventional commit message
    - The list of files to include
    - A one-line rationale for why this is a separate commit
-5. Wait for the user to approve or adjust the plan.
-6. Execute: for each planned commit, stage the files, commit, repeat.
+3. If checkpoints were suggested and deferred during work, use those boundaries
+   to inform the plan structure.
+4. Wait for the user to approve or adjust the plan.
+5. Execute: for each planned commit, stage the files, commit, repeat.
 
 If the user asks you to "just commit everything", make a single commit with an appropriate message.
 
