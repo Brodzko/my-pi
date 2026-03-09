@@ -1,7 +1,7 @@
 import { defineCommand } from 'citty';
 import { z } from 'zod';
 import { ensureAuth } from '../../lib/auth.js';
-import { execGlab } from '../../lib/exec.js';
+import { execGlab, execGit } from '../../lib/exec.js';
 import { outputJson, outputError, success } from '../../lib/envelope.js';
 import { printSchemaAndExit } from '../../lib/schema-flag.js';
 import { GlError, ErrorCode } from '../../lib/errors.js';
@@ -58,6 +58,25 @@ export const checkoutCommand = defineCommand({
       if (args.detach) glabArgs.push('--detach');
 
       await execGlab(glabArgs);
+
+      // After checkout, fast-forward the local branch to match the remote.
+      // `glab mr checkout` doesn't pull when the branch already exists locally,
+      // so we need to sync explicitly.
+      if (!args.detach) {
+        try {
+          // Get the current branch's upstream ref
+          const branch = await execGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+          await execGit(['fetch', 'origin', branch]);
+          // Try fast-forward merge; if it fails (e.g. diverged), don't break checkout
+          try {
+            await execGit(['merge', '--ff-only', `origin/${branch}`]);
+          } catch {
+            // Not fast-forwardable — leave branch as-is, user can rebase manually
+          }
+        } catch {
+          // fetch failed — offline or no tracking branch; non-fatal
+        }
+      }
 
       outputJson(
         success({

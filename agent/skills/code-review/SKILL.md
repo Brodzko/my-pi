@@ -66,8 +66,11 @@ inline instructions.
 3. Parse the MR diff into the set of changed files.
 4. Analyze the changes and prepare review annotations.
 5. Build file list using dependency ordering (§ File Ordering).
-6. Enter the review loop with `diffRef` set to the MR target branch (e.g.
-   `main`).
+6. Compute the merge-base: `git merge-base HEAD <target-branch>` to get the
+   SHA where the MR branch diverged from the target. Enter the review loop
+   with `diffRef` set to that SHA (not the target branch name — using the
+   branch directly would include unrelated changes that landed on the target
+   after the MR branch diverged).
 7. After synthesis (§ Session Synthesis), offer to post findings to GitLab using
    `gl mr review submit` or `gl mr note create-line`.
 
