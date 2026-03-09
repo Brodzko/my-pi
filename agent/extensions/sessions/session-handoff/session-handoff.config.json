@@ -3,6 +3,6 @@
   "commandName": "handoff",
   "statusKey": "session-handoff",
   "notificationAutoClearMs": 4000,
-  "modelKeys": ["openai-codex/gpt-5.1-codex-mini", "openai-codex/gpt-5.1"],
+  "modelKeys": ["claude-haiku-4-5", "openai-codex/gpt-5.1"],
   "maxBytes": 260000
 }

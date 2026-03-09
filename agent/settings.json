@@ -12,7 +12,7 @@
     "openai-codex/gpt-5.4"
   ],
   "hideThinkingBlock": true,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "extensions": [
     "~/rossum/coding-agents/pi/extensions",
     "./extensions/sessions"
