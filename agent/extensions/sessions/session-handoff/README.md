@@ -38,6 +38,7 @@ The first message is **not auto-submitted**; it is prefilled so the user can rev
 - Emits telemetry entries:
   - `session-handoff:attempt` for each generation attempt
   - `session-handoff:generate` for final command outcome
+- Appends debug logs to `.brodzko/logs/session-handoff.log` in the current project cwd.
 
 ## Config
 
@@ -49,7 +50,7 @@ File: `session-handoff.config.json`
   "commandName": "handoff",
   "statusKey": "session-handoff",
   "notificationAutoClearMs": 4000,
-  "modelKeys": ["openai-codex/gpt-5.1-codex-mini", "openai-codex/gpt-5.1"],
+  "modelKeys": ["anthropic/claude-sonnet-4-6"],
   "maxBytes": 260000
 }
 ```

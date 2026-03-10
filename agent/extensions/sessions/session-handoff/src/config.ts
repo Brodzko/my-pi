@@ -14,7 +14,7 @@ const SessionHandoffConfigSchema = z
     modelKeys: z
       .array(z.string().min(1))
       .min(1)
-      .default(['openai-codex/gpt-5.1-codex-mini', 'openai-codex/gpt-5.1']),
+      .default(['anthropic/claude-sonnet-4-6']),
     maxBytes: z.number().int().min(1).default(DEFAULT_MAX_BYTES),
   })
   .strict();

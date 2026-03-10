@@ -15,6 +15,7 @@ import { resolveTextModelAvailability } from '../../shared/model-availability';
 import { createStatusController } from '../../shared/status';
 import { buildHandoffContextPayload } from './context';
 import { sessionHandoffConfigLoadResult } from './config';
+import { createDebugLogger, serializeError } from './debug-log';
 import { generateHandoffSummary } from './generate';
 import { composeHandoffPrefill } from './message';
 
@@ -274,7 +275,17 @@ const runHandoff = async (
   state: HandoffState,
   initialInstruction: string
 ): Promise<void> => {
+  const sourceSessionId = ctx.sessionManager.getSessionId();
+  const sourceSessionFile = ctx.sessionManager.getSessionFile() ?? undefined;
+  const debug = createDebugLogger(ctx.cwd);
+
+  await debug.log(
+    sourceSessionId,
+    `Started handoff (sessionFile: ${sourceSessionFile ?? 'none'}, initialInstructionChars: ${initialInstruction.length})`
+  );
+
   if (!sessionHandoffConfigLoadResult.valid) {
+    await debug.log(sourceSessionId, 'Failed: invalid session-handoff config');
     notifyInvalidConfigOnce(ctx, state);
 
     statusController.setStatus(
@@ -288,6 +299,7 @@ const runHandoff = async (
   }
 
   if (!sessionHandoffConfig.enabled) {
+    await debug.log(sourceSessionId, 'Failed: handoff disabled in config');
     statusController.setStatus(
       ctx,
       'error',
@@ -298,15 +310,22 @@ const runHandoff = async (
     return;
   }
 
-  const sourceSessionId = ctx.sessionManager.getSessionId();
-  const sourceSessionFile = ctx.sessionManager.getSessionFile() ?? undefined;
   const entries = ctx.sessionManager.getBranch();
   const payload = buildHandoffContextPayload(
     entries,
     sessionHandoffConfig.maxBytes
   );
 
+  await debug.log(
+    sourceSessionId,
+    `Built payload (entries: ${entries.length}, serializedBytes: ${payload.serializedBytes}, truncated: ${payload.truncated}, touchedFiles: ${payload.touchedFiles.length})`
+  );
+
   if (!payload.conversationText.trim()) {
+    await debug.log(
+      sourceSessionId,
+      'Failed: no user/assistant conversation to summarize'
+    );
     statusController.setStatus(
       ctx,
       'error',
@@ -319,6 +338,10 @@ const runHandoff = async (
 
   const targetSessionModel = await chooseTargetSessionModel(ctx);
   if (!targetSessionModel) {
+    await debug.log(
+      sourceSessionId,
+      'Failed: no selectable text model available or model selection cancelled'
+    );
     statusController.setStatus(
       ctx,
       'error',
@@ -329,13 +352,24 @@ const runHandoff = async (
     return;
   }
 
+  await debug.log(
+    sourceSessionId,
+    `Selected target session model ${targetSessionModel.provider}/${targetSessionModel.id}`
+  );
+
   const optionalInstruction = await collectOptionalInstruction(
     ctx,
     initialInstruction
   );
   if (optionalInstruction === undefined) {
+    await debug.log(sourceSessionId, 'Cancelled: optional instruction editor');
     return;
   }
+
+  await debug.log(
+    sourceSessionId,
+    `Collected optional instruction (chars: ${optionalInstruction.length})`
+  );
 
   const modelAvailability = await resolveTextModelAvailability(
     ctx,
@@ -344,6 +378,10 @@ const runHandoff = async (
   const configuredModel = modelAvailability.selected;
 
   if (!configuredModel) {
+    await debug.log(
+      sourceSessionId,
+      `Failed: configured model unavailable (${sessionHandoffConfig.modelKeys.join(', ')})`
+    );
     statusController.setStatus(
       ctx,
       'error',
@@ -356,6 +394,11 @@ const runHandoff = async (
 
   const startedAt = Date.now();
 
+  await debug.log(
+    sourceSessionId,
+    `Generating handoff with ${configuredModel.model.provider}/${configuredModel.model.id}`
+  );
+
   try {
     const generated = await generateHandoffSummary({
       model: configuredModel.model,
@@ -365,6 +408,12 @@ const runHandoff = async (
       onStatus: message =>
         statusController.setStatus(ctx, 'dim', message, false),
       onAttempt: attempt => {
+        void debug.log(
+          sourceSessionId,
+          attempt.success
+            ? `Generation attempt succeeded with ${attempt.model}`
+            : `Generation attempt failed with ${attempt.model}: ${attempt.error ?? 'unknown error'}`
+        );
         pi.appendEntry('session-handoff:attempt', {
           sourceSessionId,
           sourceSessionFile,
@@ -372,6 +421,11 @@ const runHandoff = async (
         });
       },
     });
+
+    await debug.log(
+      sourceSessionId,
+      `Generated handoff successfully with ${generated.model} tokens=${generated.usage.totalTokens} cost=$${generated.usage.cost.total}`
+    );
 
     const prefill = composeHandoffPrefill(
       generated.handoffMarkdown,
@@ -384,12 +438,19 @@ const runHandoff = async (
     });
 
     if (newSessionResult.cancelled) {
+      await debug.log(sourceSessionId, 'Cancelled: newSession flow');
       statusController.setStatus(ctx, 'error', '❌ handoff cancelled', true);
       return;
     }
 
+    await debug.log(sourceSessionId, 'Opened new session successfully');
+
     const modelSet = await pi.setModel(targetSessionModel);
     if (!modelSet) {
+      await debug.log(
+        sourceSessionId,
+        `Warning: failed to activate target model ${targetSessionModel.provider}/${targetSessionModel.id} in new session`
+      );
       ctx.ui.notify(
         `Could not activate ${targetSessionModel.provider}/${targetSessionModel.id} in new session`,
         'warning'
@@ -414,6 +475,11 @@ const runHandoff = async (
       latencyMs,
     });
 
+    await debug.log(
+      sourceSessionId,
+      `Success: handoff ready in new session latencyMs=${latencyMs}`
+    );
+
     statusController.setStatus(
       ctx,
       'success',
@@ -422,6 +488,8 @@ const runHandoff = async (
     );
   } catch (error) {
     const message = toErrorMessage(error, 'Unknown handoff error');
+
+    await debug.log(sourceSessionId, `Failed: ${serializeError(error)}`);
 
     appendTelemetryEntry(pi, {
       success: false,
@@ -453,6 +521,11 @@ const registerHandoffCommand = (pi: ExtensionAPI, state: HandoffState) => {
       await ctx.waitForIdle();
 
       if (state.running) {
+        const debug = createDebugLogger(ctx.cwd);
+        await debug.log(
+          ctx.sessionManager.getSessionId(),
+          'Skipped: handoff generation already in progress'
+        );
         ctx.ui.notify('Handoff generation already in progress', 'warning');
         return;
       }

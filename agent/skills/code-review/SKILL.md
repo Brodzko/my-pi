@@ -156,14 +156,15 @@ for each file in list:
   read quill output → decision + annotations
 
   if APPROVE:
-    record annotations in session (including any instruct/question annotations),
-    continue to next file — approve means "I'm done with this file, move on"
+    record annotations in session (including any instruct/question annotations)
+    approve means "I'm done with this file"
+    → before opening the next file, pause and confirm (§ Between-file confirm)
 
   if DENY:
     pause the walk
     read annotations — answer questions, make fixes, discuss
     when resolved: re-open same file for confirmation
-      if user approves on re-open → record, continue
+      if user approves on re-open → record, then pause and confirm (§ Between-file confirm)
       if user denies again → iterate until resolved or user says "move on"
       if user aborts → end walk
 
@@ -172,6 +173,23 @@ for each file in list:
 
 run session synthesis (§ Session Synthesis)
 ```
+
+### Between-file confirm
+
+After processing a file (approve, or deny→re-approve cycle), **never open the
+next file in Quill automatically.** Always pause and present a summary of the
+file just reviewed (decision, key annotations, any answers to questions), then
+ask the user to continue:
+
+```
+use choose_options with "Continue to next file? (<next-file-path>)" → yes / no
+  if yes → open next file in Quill
+  if no  → end walk, go to session synthesis
+```
+
+This gives the reviewer time to read answers, reflect, or stop the session.
+The same rule applies when re-opening a denied file after fixes — confirm before
+the re-open as well.
 
 ### Deny semantics
 
@@ -190,9 +208,11 @@ When a file is denied:
    - For `comment` annotations: acknowledge and incorporate.
 3. Once all discussion and changes are done, prepare updated annotations (new
    observations on changed code, carried-over unresolved items).
-4. Re-open the file in Quill with the updated annotations so the user can
+4. Before re-opening the file, pause and confirm per § Between-file confirm
+   (prompt: "Re-open <file> for verification?").
+5. Re-open the file in Quill with the updated annotations so the user can
    verify.
-5. Provide stable `id` values for round-trip continuity.
+6. Provide stable `id` values for round-trip continuity.
 
 **Important:** do not try to answer questions or have discussions inside Quill
 via annotation replies. All conversation happens in the TUI between Quill
