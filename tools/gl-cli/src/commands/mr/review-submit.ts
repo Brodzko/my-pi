@@ -94,7 +94,10 @@ const executeAction = async (
         },
       };
 
-      const tmpFile = join(tmpdir(), `gl-review-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+      const tmpFile = join(
+        tmpdir(),
+        `gl-review-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+      );
       writeFileSync(tmpFile, JSON.stringify(requestBody));
 
       let result: { id: string; notes: { id: number }[] };
@@ -113,7 +116,9 @@ const executeAction = async (
           data => data as { id: string; notes: { id: number }[] }
         );
       } finally {
-        try { unlinkSync(tmpFile); } catch {}
+        try {
+          unlinkSync(tmpFile);
+        } catch {}
       }
       return { discussionId: result.id, id: result.notes[0]?.id };
     }
