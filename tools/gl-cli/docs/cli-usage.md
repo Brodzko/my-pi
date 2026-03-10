@@ -41,6 +41,37 @@ gl mr list --reviewer @me --state opened
 gl mr list --author alice --label review-needed --sort created_desc --limit 10
 ```
 
+### Create
+
+```bash
+# Create MR with title and reviewers (squash + delete branch enabled by default)
+gl mr create --title "feat(queue): add batch processing" --reviewer jan.marsicek
+
+# With description and multiple reviewers
+gl mr create --title "fix(api): handle timeout" --description "Closes JIRA-123" --reviewer jan.marsicek,jan.pfajfr
+
+# With labels, targeting a specific branch
+gl mr create --title "chore(deps): bump vite" --target-branch develop --label dependencies
+
+# Create as draft
+gl mr create --title "wip: explore new approach" --draft
+
+# Dry run — see what would be created
+gl mr create --title "feat(queue): add batch processing" --reviewer jan.marsicek --dry-run
+```
+
+Flags:
+
+- `--title` (required) — MR title
+- `--description` — MR body
+- `--target-branch` — target branch (default: `master`)
+- `--reviewer` — comma-separated reviewer usernames
+- `--label` — comma-separated labels
+- `--squash` — squash commits on merge (default: `true`)
+- `--remove-branch` — delete source branch on merge (default: `true`)
+- `--draft` — mark as draft
+- `--dry-run` — validate without creating
+
 ### Context
 
 ```bash
