@@ -183,9 +183,7 @@ export const noteCreateLineCommand = defineCommand({
           head_sha: latest.head_commit_sha,
           old_path: fileChange.old_path,
           new_path: fileChange.new_path,
-          ...(lineType === 'new'
-            ? { new_line: line }
-            : { old_line: line }),
+          ...(lineType === 'new' ? { new_line: line } : { old_line: line }),
         },
       };
 
@@ -208,7 +206,9 @@ export const noteCreateLineCommand = defineCommand({
           data => data as { id: string; notes: { id: number }[] }
         );
       } finally {
-        try { unlinkSync(tmpFile); } catch {}
+        try {
+          unlinkSync(tmpFile);
+        } catch {}
       }
 
       outputJson(

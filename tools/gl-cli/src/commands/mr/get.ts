@@ -94,10 +94,7 @@ export const getCommand = defineCommand({
 
       if (sections.includes('changes')) {
         const raw = await execGlabJson(
-          [
-            'api',
-            `/projects/${projectId}/merge_requests/${iid}/changes`,
-          ],
+          ['api', `/projects/${projectId}/merge_requests/${iid}/changes`],
           data => data as { changes: unknown[] }
         );
         result.changes = (raw.changes ?? []).map(c =>
@@ -107,10 +104,7 @@ export const getCommand = defineCommand({
 
       if (sections.includes('discussions')) {
         const raw = await execGlabJson(
-          [
-            'api',
-            `/projects/${projectId}/merge_requests/${iid}/discussions`,
-          ],
+          ['api', `/projects/${projectId}/merge_requests/${iid}/discussions`],
           data => data as unknown[]
         );
         result.discussions = raw
@@ -148,10 +142,7 @@ export const getCommand = defineCommand({
 
       if (sections.includes('approvals')) {
         const raw = await execGlabJson(
-          [
-            'api',
-            `/projects/${projectId}/merge_requests/${iid}/approvals`,
-          ],
+          ['api', `/projects/${projectId}/merge_requests/${iid}/approvals`],
           data =>
             data as {
               approved: boolean;
