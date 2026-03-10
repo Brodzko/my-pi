@@ -12,11 +12,8 @@ import {
   renderSubscriptionLines,
   modelProviderToUsageProvider,
 } from './subscription-footer';
-import {
-  fetchSubscriptionUsageEntries,
-  type ProviderId,
-  type SubscriptionUsageEntry,
-} from './subscription-limits';
+import { getSubscriptionUsageEntries } from './subscription-cache';
+import type { ProviderId, SubscriptionUsageEntry } from './subscription-limits';
 
 type ThemeFg = { fg: (color: ThemeColor, text: string) => string };
 
@@ -102,7 +99,7 @@ export const createFooter = (
         return;
       }
 
-      const entries = await fetchSubscriptionUsageEntries(
+      const entries = await getSubscriptionUsageEntries(
         deps.ctx,
         activeUsageProvider
       );

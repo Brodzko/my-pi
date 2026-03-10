@@ -44,7 +44,7 @@ RUN echo "Hello"
 
 # Install Quill
 # Bump QUILL_VERSION to bust Docker cache and force a fresh clone
-ARG QUILL_VERSION=0.0.3
+ARG QUILL_VERSION=0.0.4
 RUN git clone https://github.com/Brodzko/quill.git /tmp/quill \
   && cd /tmp/quill \
   && npm ci \
