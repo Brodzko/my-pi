@@ -1,6 +1,7 @@
 import { defineCommand } from 'citty';
 import { listCommand } from './list.js';
 import { getCommand } from './get.js';
+import { createCommand } from './create.js';
 import { checkoutCommand } from './checkout.js';
 import { noteCreateCommand } from './note-create.js';
 import { noteCreateLineCommand } from './note-create-line.js';
@@ -41,6 +42,7 @@ export const mrCommand = defineCommand({
   subCommands: {
     list: listCommand,
     get: getCommand,
+    create: createCommand,
     checkout: checkoutCommand,
     note: noteCommand,
     discussion: discussionCommand,

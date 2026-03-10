@@ -36,6 +36,52 @@ read ../../tools/gl-cli/docs/cli-usage.md
 
 This covers all commands, flags, output format, error codes, and jq examples.
 
+## MR creation workflow
+
+When asked to create/open a merge request, follow this flow:
+
+### 1. Compose the title
+
+Use **semantic commit format**: `type(scope): description`
+
+- `type`: `feat`, `fix`, `chore`, `refactor`, `docs`, `style`, `test`, `perf`, `ci`, `build`
+- `scope`: affected area (component, module, feature)
+- `description`: concise, imperative mood, lowercase
+
+Example: `feat(queue): add batch retry for failed jobs`
+
+### 2. Compose the description
+
+Build the description body with these sections as needed:
+
+- **What & why**: brief summary of the change (always)
+- **How to QA**: step-by-step manual testing instructions (include for anything non-trivial — UI changes, new features, behavioral changes, bug fixes)
+- **Closes ticket**: if the MR closes a Jira ticket, append `Closes {TICKET-ID}` (e.g. `Closes MAT-1234`) as the last line
+
+Ask the user if there's a Jira ticket to reference. If the change is complex, include QA instructions proactively.
+
+**Before creating the MR, present the full title + description to the user for review and editing.** Do not submit without user confirmation.
+
+### 3. Select reviewers
+
+Read the project context file (see "Project & team context" above) to get the team roster.
+
+Present a **multi-select list of reviewers** to the user using `choose_options`. List the user's own team members first, then other teams. Follow the MR conventions from context (e.g. default to one random team member, but let the user override).
+
+### 4. Create the MR
+
+```bash
+gl mr create --title "type(scope): description" --description "..." --reviewer user1,user2
+```
+
+Squash and delete-source-branch are **on by default** — no extra flags needed.
+
+Use `--draft` if the user requests a draft/WIP MR.
+
+### 5. Confirm
+
+After creation, share the MR URL from the response with the user.
+
 ## Quick Reference
 
 ### Discovery
@@ -43,6 +89,13 @@ This covers all commands, flags, output format, error codes, and jq examples.
 ```
 gl mr list --reviewer @me --state opened
 gl mr list --author alice --label bug --sort created_desc
+```
+
+### Create
+
+```
+gl mr create --title "feat(scope): description" --description "body" --reviewer user1,user2
+gl mr create --title "fix(api): handle timeout" --reviewer jan.marsicek --dry-run
 ```
 
 ### Read MR details
