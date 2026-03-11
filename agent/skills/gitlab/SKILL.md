@@ -142,6 +142,13 @@ gl mr review submit --iid 42 --input review.json
 gl mr checkout --iid 42
 ```
 
+After checking out an MR, ensure the local branch tracks the remote branch of
+the same name. If `gl mr checkout` doesn't set this up automatically, run:
+
+```bash
+git branch --set-upstream-to=origin/<branch-name>
+```
+
 ## Output format
 
 All commands return JSON:
