@@ -34,7 +34,44 @@ Each preference has:
 
 ## Preferences
 
-_No preferences recorded yet. They will be added after review sessions._
+### `pref-corrections-only` — Annotations must flag corrections only
+- **Category:** style
+- **Scope:** global
+- **Confidence:** high
+- **Discovered:** 2026-03-11
+- **Last seen:** 2026-03-11
+
+Annotations should only flag things the reviewer would want to correct — bugs,
+design concerns, style violations, missing edge cases. No explanatory
+annotations ("this is what changed"), no praise ("nice pattern here"), no
+informational commentary. Zero annotations on a clean file is fine. High
+signal-to-noise ratio is the priority.
+
+**Example:**
+```
+❌ "This function handles the retry logic with exponential backoff" (explanation)
+❌ "Good use of discriminated unions here" (praise)
+✅ "Race condition: concurrent calls both hit refresh before the first resolves" (correction)
+```
+
+### `pref-gitlab-user-endorsed-only` — GitLab comments only from user-endorsed annotations
+- **Category:** other
+- **Scope:** global
+- **Confidence:** high
+- **Discovered:** 2026-03-11
+- **Last seen:** 2026-03-11
+
+When synthesizing GitLab MR comments, only consider annotations the reviewer
+created, replied to, or explicitly approved. Agent-only annotations that were
+never interacted with are working notes and must not become GitLab comments.
+Comments must always be freshly synthesized — never copied verbatim from
+annotations or TUI discussion.
+
+**Example:**
+```
+❌ Copying annotation text: "[matches pref-X] Consider using R.map here" → GitLab
+✅ Synthesizing from user reply: reviewer flagged duplication + discussed scope in TUI → clean comment about extracting shared helper
+```
 
 ---
 

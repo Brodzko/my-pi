@@ -27,8 +27,9 @@ after an agent turn.
 1. Run `git diff --name-only` (unstaged) and/or `git diff --cached --name-only`
    (staged) to identify changed files.
 2. Build file list using dependency ordering (§ File Ordering).
-3. For each file, prepare lightweight change-summary annotations (what changed
-   and why, based on your knowledge of the work you just did).
+3. For each file, prepare annotations only for things that likely need
+   correction (bugs, logic issues, style violations, missing edge cases).
+   Do not annotate to explain what changed or praise good work.
 4. Enter the review loop with `unstaged: true` (or `staged: true` if changes are
    staged).
 
@@ -38,8 +39,10 @@ after an agent turn.
 asks for a review.
 
 1. Identify the target files. If a directory, find all relevant source files.
-2. Analyze the code and prepare substantive review annotations — bugs, design
-   concerns, style issues, questions, praise for good patterns.
+2. Analyze the code and prepare annotations only for things that likely need
+   correction — bugs, design concerns, style violations, missing edge cases.
+   Do not annotate to explain code, praise good patterns, or provide
+   informational commentary.
 3. Build file list using dependency ordering (§ File Ordering).
 4. Enter the review loop (no diff mode — raw file view unless user specifies a
    ref).
@@ -64,7 +67,9 @@ inline instructions.
    `gl mr get --iid N --include basics,changes,discussions`
 2. Check out the MR locally: `gl mr checkout --iid N`
 3. Parse the MR diff into the set of changed files.
-4. Analyze the changes and prepare review annotations.
+4. Analyze the changes and prepare annotations only for things that likely
+   need correction — bugs, design concerns, style violations, missing edge
+   cases. No explanatory or praising annotations.
 5. Build file list using dependency ordering (§ File Ordering).
 6. Compute the merge-base: `git merge-base HEAD <target-branch>` to get the
    SHA where the MR branch diverged from the target. Enter the review loop
@@ -228,7 +233,7 @@ directly to session synthesis with whatever has been accumulated.
 Every multi-file review creates a session file that accumulates state across the
 walk.
 
-**Location:** `/tmp/pi-review-sessions/<timestamp>-<short-description>.json`
+**Location:** `.brodzko/review-sessions/<timestamp>-<short-description>.json` (relative to cwd)
 
 **Structure:**
 
@@ -313,13 +318,34 @@ When both `code-review` and `gitlab` skills are active:
 #### Synthesizing GitLab comments
 
 Raw annotations and TUI conversations are working notes — they are not
-ready to post as-is. After synthesis, produce a **final comment proposal**:
+ready to post as-is. After synthesis, produce a **final comment proposal**.
 
-1. For each comment, synthesize a clear, actionable comment based on the
-   annotations _and_ any TUI discussion that happened during the review.
-   A single GitLab comment may combine multiple related annotations,
-   incorporate context from conversation, or refine wording.
-2. Present the full proposal inline in the TUI as a numbered list:
+**Source filtering — only user-endorsed annotations qualify.**
+An annotation qualifies for GitLab comment synthesis only if the reviewer:
+- **Created** it (`source: "user"`), OR
+- **Replied** to it (added a reply or discussion in the TUI), OR
+- **Approved** it (explicitly confirmed it during the review)
+
+Agent-generated annotations that the reviewer never interacted with are
+working notes and must be silently dropped — they do not become GitLab
+comments.
+
+**Synthesis — never copy, always rewrite.**
+GitLab comments must be freshly synthesized, not copied verbatim from
+annotations or TUI discussion. The raw review artifacts are messy shorthand
+between reviewer and agent. The GitLab comment is a polished communication
+to the MR author. Synthesize by:
+- Combining related annotations into a single coherent comment
+- Incorporating relevant TUI discussion context
+- Rewriting in the reviewer's voice — clear, direct, actionable
+- Dropping internal review noise (preference tags, status markers, etc.)
+
+**Steps:**
+
+1. Filter annotations to only those the reviewer endorsed (see above).
+2. Synthesize each qualifying concern into a clear, actionable GitLab
+   comment. Group related annotations where it makes sense.
+3. Present the full proposal inline in the TUI as a numbered list:
 
 ```
 GitLab comments to post on !42:
@@ -336,18 +362,17 @@ GitLab comments to post on !42:
    > Consider a mutex or deduplication of the refresh call.
 
 3. General (MR-level note)
-   > Clean implementation overall. Two concerns flagged inline —
-   > the validation duplication and the token refresh race. The rest
-   > looks good.
+   > Two concerns flagged inline — the validation duplication and
+   > the token refresh race.
 ```
 
-3. Wait for the user to approve, edit, or reject the proposal.
-4. **Only after explicit approval**, post the comments to GitLab:
+4. Wait for the user to approve, edit, or reject the proposal.
+5. **Only after explicit approval**, post the comments to GitLab:
    - Line-level comments via `gl mr note create-line`
    - General comments via `gl mr note create`
    - Post the exact text that was approved — do not rephrase after approval
-5. If the review is clean (no comments to post), offer to approve the MR
-   with `gl mr approve`.
+6. If the review is clean (no qualifying annotations), offer to approve the
+   MR with `gl mr approve`.
 
 ## Reviewer Preferences
 
@@ -435,10 +460,24 @@ liftable:
 When suggesting a promotion, show the exact text that would be added to the
 target file so the user can approve it.
 
+## Annotation Policy
+
+**Corrections only.** Every annotation must flag something the reviewer would
+want to fix or reconsider. Do not add annotations that:
+
+- Explain what the code does or what changed (the reviewer can read)
+- Praise good patterns or say "looks good"
+- Provide informational context without a concrete concern
+- Summarize intent — that's what the TUI conversation is for
+
+If in doubt whether something is worth annotating, err on the side of _not_
+annotating. A clean file with zero annotations is perfectly fine. The goal is a
+high signal-to-noise ratio where every annotation demands attention.
+
 ## Rules
 
 - **Always create the session file.** At the start of every multi-file review,
-  create the session file at `/tmp/pi-review-sessions/`. Update it after each
+  create the session file at `.brodzko/review-sessions/` (relative to cwd). Update it after each
   file's Quill output. This is not optional — the session file must exist and
   be current throughout the walk, not reconstructed after the fact.
 - **Always load reviewer preferences.** Before entering any review loop, read

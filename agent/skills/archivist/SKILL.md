@@ -167,11 +167,25 @@ Use lowercase, hyphens between words. When a ticket exists, always include it af
 
 ### Creating and switching
 
+**Default base branch is `develop`.** When creating a new branch, always branch
+from `develop` unless the user specifies a different base:
+
 ```bash
-git switch -c feat/PROJ-123-my-feature       # new branch from current HEAD
-git switch -c fix/PROJ-456-bug-name main     # new branch from specific ref
-git switch feat/existing-branch              # switch to existing
+git fetch
+git switch -c feat/PROJ-123-my-feature origin/develop   # default: from develop
+git switch -c fix/PROJ-456-bug-name main                # only if user specifies main
+git switch feat/existing-branch                          # switch to existing
 ```
+
+**Always set up remote tracking.** After creating a new branch, immediately set
+up the remote tracking branch of the same name:
+
+```bash
+git push -u origin feat/PROJ-123-my-feature
+```
+
+This is the one exception to the "never push" rule — an empty `push -u` to set
+up tracking for a freshly created branch is allowed.
 
 Prefer `git switch` over `git checkout` for branch operations.
 
@@ -232,14 +246,17 @@ Use worktrees **only when the user explicitly requests it**.
 
 ### Creating a worktree
 
+Default base is `develop` (same as branch creation):
+
 ```bash
-git worktree add .brodzko/worktrees/<branch-short-name> -b <branch-name>
+git fetch
+git worktree add .brodzko/worktrees/<branch-short-name> -b <branch-name> origin/develop
 ```
 
 Example:
 
 ```bash
-git worktree add .brodzko/worktrees/feat-parser -b feat/PROJ-123-add-parser
+git worktree add .brodzko/worktrees/feat-parser -b feat/PROJ-123-add-parser origin/develop
 ```
 
 Worktrees live under `.brodzko/worktrees/` in the repo root. Ensure this path is gitignored.
