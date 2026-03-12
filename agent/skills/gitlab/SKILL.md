@@ -1,185 +1,44 @@
 ---
 name: gitlab
-description: GitLab merge request review workflows. Use when working with GitLab MRs — listing, reviewing, commenting, approving, batch reviews. Provides the `gl` tool for structured GitLab operations.
+description: Router for GitLab workflows. Use for generic GitLab requests, then hand off to a more specific GitLab workflow skill such as opening an MR, reviewing an MR, or inspecting GitLab activity.
 ---
 
 # GitLab
 
-Use the `gl` tool for **all** GitLab operations. **Never** call `glab` directly — always go through `gl`.
+This is a **routing skill**, not the full workflow playbook.
 
-When asked about someone's work, activity, or what they've been doing — this means their **GitLab activity** (MRs authored/reviewed), not git logs.
+Use the `gl` tool for **all** GitLab operations. **Never** call `glab` directly —
+always go through `gl`. If there is no way to achieve your goals with `gl`, stop and explain to
+the user why - they can add the functionality.
 
-## Prerequisites
+Before doing any GitLab work, read:
 
-- `glab` must be installed and authenticated (`glab auth login`)
-- Must be in a git repo with a GitLab `origin` remote
+- `./common.md` — shared invariants, prerequisites, CLI contract, and errors
+- `./context.md` — team/reviewer context when reviewer selection or team-specific decisions matter
 
-## Project & team context
+## Routing
 
-Before assigning reviewers or making team-specific decisions, read:
+Pick the narrowest matching workflow:
 
-```
-read ./context.md
-```
+- **Open or create a merge request** → use `gitlab-open-merge-request`
+- **Review a merge request** → use `gitlab-review-merge-request`
+- **Understand someone's work/activity** → use `gitlab-activity`
 
-(Relative to this skill directory.)
+If the user asks for a one-off GitLab action that does not justify a whole
+workflow (for example: add one comment, approve one MR, resolve one thread),
+stay in this skill, read `./common.md`, and call the relevant `gl` command
+directly.
 
-## Learning the CLI
+## One-off operations
 
-Before first use, read the full command reference. The file is located at `tools/gl-cli/docs/cli-usage.md` inside the pi config repo (`~/.pi`):
+Use direct `gl` commands for simple deterministic actions:
 
-```
-read ../../tools/gl-cli/docs/cli-usage.md
-```
+- `gl mr get --iid N --include basics,changes,discussions,pipeline,approvals`
+- `gl mr note create --iid N --body "..."`
+- `gl mr note create-line --iid N --file path --line 10 --line-type new --body "..."`
+- `gl mr discussion reply --iid N --discussion-id abc123 --body "..."`
+- `gl mr discussion resolve --iid N --discussion-id abc123`
+- `gl mr approve --iid N`
+- `gl mr unapprove --iid N`
 
-(Relative to this skill directory.)
-
-This covers all commands, flags, output format, error codes, and jq examples.
-
-## MR creation workflow
-
-When asked to create/open a merge request, follow this flow:
-
-### 1. Compose the title
-
-Use **semantic commit format**: `type(scope): description`
-
-- `type`: `feat`, `fix`, `chore`, `refactor`, `docs`, `style`, `test`, `perf`, `ci`, `build`
-- `scope`: affected area (component, module, feature)
-- `description`: concise, imperative mood, lowercase
-
-Example: `feat(queue): add batch retry for failed jobs`
-
-### 2. Compose the description
-
-Build the description body with these sections as needed:
-
-- **What & why**: brief summary of the change (always)
-- **How to QA**: step-by-step manual testing instructions (include for anything non-trivial — UI changes, new features, behavioral changes, bug fixes)
-- **Closes ticket**: if the MR closes a Jira ticket, append `Closes {TICKET-ID}` (e.g. `Closes MAT-1234`) as the last line
-
-Ask the user if there's a Jira ticket to reference. If the change is complex, include QA instructions proactively.
-
-**Before creating the MR, present the full title + description to the user for review and editing.** Do not submit without user confirmation.
-
-### 3. Select reviewers
-
-Read the project context file (see "Project & team context" above) to get the team roster.
-
-Present a **multi-select list of reviewers** to the user using `choose_options`. List the user's own team members first, then other teams. Follow the MR conventions from context (e.g. default to one random team member, but let the user override).
-
-### 4. Create the MR
-
-```bash
-gl mr create --title "type(scope): description" --description "..." --reviewer user1,user2
-```
-
-Squash and delete-source-branch are **on by default** — no extra flags needed.
-
-Use `--draft` if the user requests a draft/WIP MR.
-
-### 5. Confirm
-
-After creation, share the MR URL from the response with the user.
-
-## Quick Reference
-
-### Discovery
-
-```
-gl mr list --reviewer @me --state opened
-gl mr list --author alice --label bug --sort created_desc
-```
-
-### Create
-
-```
-gl mr create --title "feat(scope): description" --description "body" --reviewer user1,user2
-gl mr create --title "fix(api): handle timeout" --reviewer jan.marsicek --dry-run
-```
-
-### Read MR details
-
-```
-gl mr get --iid 42 --include basics,changes,discussions,pipeline,approvals
-```
-
-Sections: `basics`, `changes`, `discussions`, `pipeline`, `approvals`. Comma-separated.
-
-### Comments
-
-```
-gl mr note create --iid 42 --body "LGTM"
-gl mr note create --iid 42 --body "LGTM" --unique
-gl mr note create-line --iid 42 --file src/x.ts --line 10 --line-type new --body "Nit: rename"
-```
-
-### Discussions
-
-```
-gl mr discussion reply --iid 42 --discussion-id abc123 --body "Fixed"
-gl mr discussion resolve --iid 42 --discussion-id abc123
-gl mr discussion unresolve --iid 42 --discussion-id abc123
-```
-
-### Approval
-
-```
-gl mr approve --iid 42
-gl mr unapprove --iid 42
-```
-
-### Batch review
-
-```
-gl mr review submit --iid 42 --input review.json --dry-run
-gl mr review submit --iid 42 --input review.json
-```
-
-### Checkout
-
-```
-gl mr checkout --iid 42
-```
-
-After checking out an MR, ensure the local branch tracks the remote branch of
-the same name. If `gl mr checkout` doesn't set this up automatically, run:
-
-```bash
-git branch --set-upstream-to=origin/<branch-name>
-```
-
-## Output format
-
-All commands return JSON:
-
-```json
-{ "ok": true, "data": { ... }, "meta": { ... } }
-{ "ok": false, "error": { "code": "...", "message": "..." } }
-```
-
-## Introspection
-
-Every command supports `--schema` to print its input JSON schema:
-
-```
-gl mr review submit --schema
-```
-
-## Review workflow
-
-1. `gl mr list --reviewer @me --state opened` — find MRs to review
-2. `gl mr get --iid N --include basics,changes,discussions` — understand the MR
-3. `gl mr checkout --iid N` — check out the code locally for deeper analysis
-4. Post comments with `gl mr note create` / `gl mr note create-line`
-5. Resolve addressed discussions with `gl mr discussion resolve`
-6. `gl mr approve --iid N` when satisfied
-
-For batch operations, construct a `review.json` and use `gl mr review submit`.
-
-## Error handling
-
-- `AUTH_REQUIRED` — remind user to run `glab auth login`
-- `LINE_NOT_IN_DIFF` — line number not in MR diff; verify with `gl mr get --include changes`
-- `PRECONDITION_FAILED` — strict check failed (draft MR, red pipeline, unresolved discussions)
-- `NOT_FOUND` — MR or resource doesn't exist
+Use workflows when the task needs sequencing, policy, or user decisions.
