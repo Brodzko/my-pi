@@ -17,8 +17,5 @@
     "~/rossum/coding-agents/pi/extensions",
     "./extensions/sessions"
   ],
-  "skills": [
-    "~/rossum/coding-agents/pi/skills",
-    "./skills"
-  ]
+  "skills": ["~/rossum/coding-agents/pi/skills", "./skills"]
 }

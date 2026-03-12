@@ -18,6 +18,7 @@ project-level agent instructions.
 ## Preference format
 
 Each preference has:
+
 - **ID:** Stable short identifier for grep/reference (e.g. `pref-naming-handlers`)
 - **Category:** One of: `naming`, `structure`, `patterns`, `style`, `testing`,
   `error-handling`, `performance`, `documentation`, `dependencies`, `types`,
@@ -35,6 +36,7 @@ Each preference has:
 ## Preferences
 
 ### `pref-corrections-only` — Annotations must flag corrections only
+
 - **Category:** style
 - **Scope:** global
 - **Confidence:** high
@@ -48,30 +50,140 @@ informational commentary. Zero annotations on a clean file is fine. High
 signal-to-noise ratio is the priority.
 
 **Example:**
+
 ```
 ❌ "This function handles the retry logic with exponential backoff" (explanation)
 ❌ "Good use of discriminated unions here" (praise)
 ✅ "Race condition: concurrent calls both hit refresh before the first resolves" (correction)
 ```
 
-### `pref-gitlab-user-endorsed-only` — GitLab comments only from user-endorsed annotations
+### `pref-gitlab-user-endorsed-only` — GitLab comments only from reviewer-owned or explicitly adopted points
+
 - **Category:** other
 - **Scope:** global
 - **Confidence:** high
 - **Discovered:** 2026-03-11
 - **Last seen:** 2026-03-11
 
-When synthesizing GitLab MR comments, only consider annotations the reviewer
-created, replied to, or explicitly approved. Agent-only annotations that were
-never interacted with are working notes and must not become GitLab comments.
-Comments must always be freshly synthesized — never copied verbatim from
-annotations or TUI discussion.
+When synthesizing GitLab MR comments, only consider points the reviewer
+created, replied to, or explicitly adopted in the TUI. File approval does not
+count as adopting every agent annotation on that file. Agent-only notes that
+were never explicitly adopted must not become GitLab comments.
 
 **Example:**
+
 ```
-❌ Copying annotation text: "[matches pref-X] Consider using R.map here" → GitLab
-✅ Synthesizing from user reply: reviewer flagged duplication + discussed scope in TUI → clean comment about extracting shared helper
+❌ File approved in Quill, so post the agent's bug note to GitLab
+✅ Reviewer asks their own question in Quill, so synthesize only that question for GitLab
 ```
+
+### `pref-gitlab-comments-terse-human` — GitLab comments should be short and sound human
+
+- **Category:** style
+- **Scope:** personal
+- **Confidence:** high
+- **Discovered:** 2026-03-11
+- **Last seen:** 2026-03-11
+
+Keep GitLab comments concise and natural. Prefer one short observation or
+question over an explained paragraph. Avoid wording that makes the reviewer
+sound like an AI, spec, or design doc.
+
+**Example:**
+
+```
+❌ "The `Tab ↹` badge highlight seems keyed only by `id`, but different option types can share the same numeric id..."
+✅ "Do we key the highlight by both type and id?"
+```
+
+### `pref-ternary-jsx` — Ternary over `&&` in JSX
+
+- **Category:** style
+- **Scope:** frontend
+- **Confidence:** medium
+- **Discovered:** 2026-03-12
+- **Last seen:** 2026-03-12
+
+Prefer `{condition ? <Foo /> : null}` over `{condition && <Foo />}` in JSX.
+Instructed on two separate files in a single review session.
+
+**Example:**
+
+```tsx
+❌ {hasOverflow && <OverflowMenu />}
+✅ {hasOverflow ? <OverflowMenu /> : null}
+```
+
+### `pref-compact-comments` — Comments only when intent is non-obvious
+
+- **Category:** documentation
+- **Scope:** global
+- **Confidence:** medium
+- **Discovered:** 2026-03-12
+- **Last seen:** 2026-03-12
+
+Remove or compact explanatory comments. They are only necessary if intent cannot
+be inferred from naming. Prefer clarity through naming/structure over inline
+commentary. When a comment is needed, keep it short — one line, not a paragraph.
+
+**Example:**
+
+```ts
+❌ // Self-width fallback: observe root element width when no budget is provided.
+❌ // Prune stale refs and reset counts when the item list changes.
+✅ // State (not derived from ref) so first mount triggers re-render once refs populate.
+   (non-obvious design decision → comment justified)
+```
+
+### `pref-types-near-component` — Types above component, below utilities
+
+- **Category:** structure
+- **Scope:** frontend
+- **Confidence:** medium
+- **Discovered:** 2026-03-12
+- **Last seen:** 2026-03-12
+
+Place type definitions (props, options, result types) right above the component
+or hook definition, not at the top of the file when utility functions sit
+between. Reader should see the type contract immediately before the
+implementation it describes.
+
+**Example:**
+
+```ts
+// utilities first
+const computeFittingCount = (...) => { ... };
+
+// then types
+type UseOverflowContainerOptions = { ... };
+
+// then implementation
+const useOverflowContainer = (options: UseOverflowContainerOptions) => { ... };
+```
+
+### `pref-diff-mode-review` — Use diff mode for modified files in review
+
+- **Category:** other
+- **Scope:** global
+- **Confidence:** low
+- **Discovered:** 2026-03-12
+- **Last seen:** 2026-03-12
+
+When reviewing modified files (not new files), open them in Quill's diff mode
+against the merge base. This surfaces what actually changed rather than
+requiring the reviewer to mentally diff the entire file.
+
+### `pref-no-for-of` — No `for...of` loops
+
+- **Category:** style
+- **Scope:** project:elis-frontend
+- **Confidence:** low
+- **Discovered:** 2026-03-12
+- **Last seen:** 2026-03-12
+
+The project linter blocks `for...of` loops. Use `forEach` as the minimum
+imperative alternative when a declarative approach (Remeda, `.map`, etc.) isn't
+a good fit.
 
 ---
 

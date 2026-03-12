@@ -3,6 +3,10 @@
 A pi extension that gives the agent fast, editor-accurate diagnostics (type
 errors, lint violations, etc.) via a `get_diagnostics` tool. It uses the same
 language servers that VS Code uses, so results match what you see in your editor.
+In agent workflow, formatting remains a separate concern: when a project exposes
+an auto-formatter (for example via a format script/job or a formatter such as
+Prettier), run it on changed files before using diagnostics to verify the final
+state.
 
 ## How it works
 
