@@ -190,6 +190,21 @@ export const getCachedFiles = (cwd: string): FileResult | undefined => {
   };
 };
 
+/** Always fetch fresh files, update cache, and return the result. */
+export const refreshFiles = async (
+  cwd: string,
+  pi: ExtensionAPI
+): Promise<FileResult> => {
+  const fresh = await fetchFiles(cwd, pi);
+  updateCache(cwd, fresh, false);
+  return {
+    files: fresh.files,
+    method: fresh.method,
+    durationMs: fresh.durationMs,
+    fromCache: false,
+  };
+};
+
 /**
  * Return files for `cwd`.
  * - Cache hit → return immediately (fromCache: true) and refresh in background.
