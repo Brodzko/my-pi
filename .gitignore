@@ -10,3 +10,5 @@ auth.json
 
 .cache
 .vscode
+
+.DS_Store
