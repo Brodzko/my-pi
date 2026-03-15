@@ -2,11 +2,12 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
+import { spawnSync } from 'node:child_process';
 import { showQuickOpen, type QuickOpenMode } from './src/dialog';
 import {
   getCachedFiles,
-  getFiles,
   prefetchFiles,
+  refreshFiles,
   type FileResult,
 } from './src/files';
 import { getSessions } from './src/sessions';
@@ -40,7 +41,7 @@ export default function (pi: ExtensionAPI) {
     try {
       const cachedFiles = getCachedFiles(ctx.cwd);
 
-      const fileResultPromise = getFiles(ctx.cwd, pi).then(fileResult => {
+      const freshFilesPromise = refreshFiles(ctx.cwd, pi).then(fileResult => {
         ctx.ui.setStatus(STATUS_KEY, formatFileStatus(fileResult));
         return fileResult;
       });
@@ -58,11 +59,11 @@ export default function (pi: ExtensionAPI) {
           sessions: [],
         },
         {
-          files: () => fileResultPromise.then(fileResult => fileResult.files),
+          files: () => freshFilesPromise.then(fileResult => fileResult.files),
           sessions: sessionPromise,
         },
         {
-          files: !cachedFiles,
+          files: true,
           sessions: false,
         },
         initialMode
@@ -75,6 +76,25 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
     }
   };
+
+  const openInQuill = (ctx: ExtensionContext, file: string): Promise<void> =>
+    ctx.ui
+      .custom<void>((tui, _theme, _kb, done) => {
+        tui.stop();
+        process.stdout.write('\x1b[2J\x1b[H');
+
+        spawnSync('quill', [file], {
+          cwd: ctx.cwd,
+          stdio: ['inherit', 'inherit', 'inherit'],
+        });
+
+        tui.start();
+        tui.requestRender(true);
+        done(undefined);
+
+        return { render: () => [], invalidate: () => {} };
+      })
+      .then(() => {});
 
   const handleResult = (
     ctx: ExtensionContext,
@@ -92,16 +112,8 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // shortcut → cat the file and display as a custom message
-    pi.exec('cat', [path], { cwd: ctx.cwd, timeout: 5_000 }).then(result => {
-      const output =
-        result.code === 0 ? result.stdout : `Error: ${result.stderr}`;
-      pi.sendMessage({
-        customType: 'quick-open:cat',
-        content: `**${path}**\n\`\`\`\n${output}\n\`\`\``,
-        display: true,
-      });
-    });
+    // shortcut → open the file in quill for review
+    void openInQuill(ctx, path);
   };
 
   // ── Terminal input: intercept "@" in the editor ───────────────────────
