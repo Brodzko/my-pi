@@ -170,6 +170,33 @@ spi() {
     return 1
   fi
 
+  # Parse --mount flags before forwarding remaining args to pi
+  local -a extra_mounts=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --mount)
+        if [[ -z "${2:-}" ]]; then
+          echo "Error: --mount requires a path argument." >&2
+          return 1
+        fi
+        local resolved
+        resolved="$(cd "$2" 2>/dev/null && pwd)" || {
+          echo "Error: --mount path '$2' does not exist or is not a directory." >&2
+          return 1
+        }
+        extra_mounts+=("${resolved}")
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
   local hash name cwd
   hash="$(_spi_hash)"
   name="${SPI_PREFIX}${hash}"
@@ -178,6 +205,13 @@ spi() {
   # Clean stale stopped container
   if docker ps -aq -f name="${name}" -f status=exited | grep -q .; then
     docker rm "${name}" >/dev/null 2>&1
+  fi
+
+  # Recreate running container when extra mounts are requested —
+  # mounts can only be set at container creation time.
+  if [[ ${#extra_mounts[@]} -gt 0 ]] && docker ps -q -f name="${name}" | grep -q .; then
+    echo "Recreating sandbox ${name} with extra mounts..."
+    docker rm -f "${name}" >/dev/null 2>&1
   fi
 
   # Start container if not running
@@ -195,6 +229,11 @@ spi() {
       -v "${cwd}:${cwd}"
       -v "${HOME}/.pi/agent:/home/sandbox/.pi/agent"
     )
+
+    local mnt
+    for mnt in "${extra_mounts[@]}"; do
+      run_args+=(-v "${mnt}:${mnt}")
+    done
 
     _spi_apply_config
     _spi_ssh_mount
