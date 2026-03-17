@@ -77,24 +77,51 @@ export default function (pi: ExtensionAPI) {
     }
   };
 
-  const openInQuill = (ctx: ExtensionContext, file: string): Promise<void> =>
-    ctx.ui
-      .custom<void>((tui, _theme, _kb, done) => {
+  type QuillResult = {
+    output: Record<string, unknown> | null;
+    aborted: boolean;
+  };
+
+  const openInQuill = async (
+    ctx: ExtensionContext,
+    file: string
+  ): Promise<void> => {
+    const result = await ctx.ui.custom<QuillResult>(
+      (tui, _theme, _kb, done) => {
         tui.stop();
         process.stdout.write('\x1b[2J\x1b[H');
 
-        spawnSync('quill', [file], {
+        const spawnResult = spawnSync('quill', [file], {
           cwd: ctx.cwd,
-          stdio: ['inherit', 'inherit', 'inherit'],
+          stdio: ['inherit', 'pipe', 'inherit'],
         });
 
         tui.start();
         tui.requestRender(true);
-        done(undefined);
+
+        if (spawnResult.status !== 0) {
+          done({ output: null, aborted: true });
+        } else {
+          const raw = spawnResult.stdout?.toString('utf-8').trim();
+          try {
+            done({ output: raw ? JSON.parse(raw) : null, aborted: false });
+          } catch {
+            done({ output: null, aborted: true });
+          }
+        }
 
         return { render: () => [], invalidate: () => {} };
-      })
-      .then(() => {});
+      }
+    );
+
+    if (result.aborted || !result.output) return;
+
+    const json = JSON.stringify(result.output);
+    pi.sendUserMessage(
+      `Quill review completed for \`${file}\`:\n\n\`\`\`json\n${json}\n\`\`\``,
+      { deliverAs: 'followUp' }
+    );
+  };
 
   const handleResult = (
     ctx: ExtensionContext,
