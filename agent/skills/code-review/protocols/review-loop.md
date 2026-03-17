@@ -8,6 +8,25 @@ Before starting:
 - read `../REVIEWER.md`
 - read `./session-file.md`
 
+## Critical invariants
+
+These rules are **non-negotiable** and override any other consideration:
+
+1. **Abort means stop entirely.** If `quill_review` returns `null` or the
+   decision is absent/aborted, the review walk is **over**. Do not open another
+   file. Do not re-open the current file. Do not ask "continue?". Go directly
+   to session synthesis with whatever is already recorded, or simply stop if
+   nothing was recorded.
+
+2. **Always pause between files.** After processing each file (approve or
+   deny→resolve cycle), you **must** stop and ask the user whether to continue
+   before opening the next file. Use `choose_options` for this gate. Never
+   call `quill_review` for the next file without an explicit user go-ahead.
+
+3. **One `quill_review` call at a time.** Never queue or batch multiple
+   `quill_review` calls. Wait for the current one to resolve, process its
+   output fully, run the between-file pause, and only then consider the next.
+
 ## Loop
 
 1. Initialize the session file.
@@ -28,9 +47,10 @@ Before starting:
      baseline exists, re-open the same file in the matching diff mode before
      continuing
    - read the Quill output
+   - **if aborted → stop immediately** (see critical invariant 1)
    - persist the result to the session file immediately
-6. After each file, pause before moving on. Never open the next file
-   automatically.
+6. **Mandatory pause** — after each file, ask the user whether to continue
+   (see critical invariant 2). Never open the next file automatically.
 7. When the walk ends, run session synthesis.
 
 ## Per-file outcomes
@@ -64,20 +84,34 @@ Do not try to continue the conversation inside Quill replies.
 
 ### Abort
 
-Abort means: **stop the review walk immediately**.
+Abort means: **stop the review walk immediately. This is absolute.**
 
-- do not open more files
-- do not re-open the current file
-- go straight to session synthesis with whatever is already recorded
+- do **not** open more files
+- do **not** re-open the current file
+- do **not** ask "continue?" or "want to review more?"
+- do **not** call `quill_review` again for any reason
+- go straight to session synthesis with whatever is already recorded, or simply
+  stop if nothing was recorded
+
+If you are uncertain whether the output represents an abort, treat it as an
+abort. Err on the side of stopping.
 
 ## Between-file confirmation
 
-After every approved file, or denied-then-reapproved cycle, pause and ask:
+After every approved file, or denied-then-reapproved cycle, you **must** pause
+and ask using `choose_options` with **three options**:
 
-- continue to next file?
-- stop and synthesize now?
+1. **Continue** — open the next file in the walk
+2. **Stop & synthesize** — end the walk and run session synthesis
+3. **Pause — I have a question / instruction** — stop the walk and hand control
+   back to the user in the TUI. The user may ask questions, give instructions,
+   request code changes, or discuss what they've seen so far. After the
+   conversation resolves, ask the same three-option question again to let the
+   user resume, stop, or pause again.
 
-This pause is mandatory.
+**This pause is mandatory and non-negotiable.** Never skip it. Never open the
+next file without explicit user confirmation. The user controls the pace of
+the review, not the agent.
 
 ## Annotation policy
 

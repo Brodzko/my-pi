@@ -149,10 +149,14 @@ operationally.
 
 ### Multi-file review
 
-- `approve` → record the file and ask whether to continue to the next file
+- `approve` → record the file, then **always pause and ask** with three options
+  via `choose_options`: continue to next file / stop & synthesize / pause to
+  ask or instruct. Never open the next file without explicit user confirmation.
 - `deny` → pause the walk, process feedback in the TUI, then optionally re-open
   the same file
-- abort → end the entire review walk
+- abort → **end the entire review walk immediately**. Do not open another file.
+  Do not re-open the current file. Do not ask any follow-up questions about
+  continuing. Stop.
 
 ### Pre-commit review
 
