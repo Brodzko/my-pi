@@ -66,8 +66,21 @@ gl mr get --iid 42 --include basics,changes,discussions,pipeline,approvals
 ### Create
 
 ```bash
-gl mr create --title "feat(scope): description" --description "body" --reviewer user1,user2
+gl mr create --title "feat(scope): description" --description "body" --target-branch develop --reviewer user1,user2
 gl mr create --title "fix(api): handle timeout" --reviewer jan.marsicek --dry-run
+```
+
+### Update
+
+```bash
+gl mr update --iid 42 --title "new title"
+gl mr update --iid 42 --description "updated body"
+gl mr update --iid 42 --target-branch develop
+gl mr update --iid 42 --add-reviewer jan.marsicek --add-label bug
+gl mr update --iid 42 --add-assignee martin.brodziansky
+gl mr update --iid 42 --draft         # mark as draft
+gl mr update --iid 42 --no-draft      # mark as ready
+gl mr update --iid 42 --dry-run       # preview without executing
 ```
 
 ### Comments and discussions
