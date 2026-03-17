@@ -13,6 +13,12 @@ Before starting, read:
 This skill owns the **workflow** for opening an MR. The `gl` tool performs the
 atomic GitLab operations.
 
+## Defaults
+
+- **Target branch**: always `develop` unless the user explicitly specifies a
+  different branch.
+- **Assignee**: always include `martin.brodziansky` as assignee on every MR.
+
 ## Workflow
 
 1. **Identify the branch.** Determine the current branch and whether it is the
@@ -30,15 +36,37 @@ atomic GitLab operations.
 6. **Select reviewers.** Use `choose_options` with the roster from
    `../gitlab/context.md`. List the user's own team first, then others.
 7. **Confirm the final proposal.** Present the full title + description +
-   reviewers to the user for review/editing. Do not submit without approval.
+   reviewers + assignee to the user for review/editing. Do not submit without
+   approval.
 8. **Create the MR.** Call:
 
 ```bash
-gl mr create --title "type(scope): description" --description "..." --reviewer user1,user2
+gl mr create --title "type(scope): description" --description "..." --target-branch develop --reviewer user1,user2
+```
+
+Then immediately add the assignee:
+
+```bash
+gl mr update --iid <IID> --add-assignee martin.brodziansky
 ```
 
 9. **Respect draft intent.** Add `--draft` if the user wants a draft/WIP MR.
 10. **Confirm completion.** Return the MR URL from the command response.
+
+## Post-creation fixes
+
+If a mistake was made in the MR (wrong title, description, target branch, etc.),
+use `gl mr update` to fix it instead of recreating:
+
+```bash
+gl mr update --iid <IID> --title "new title"
+gl mr update --iid <IID> --description "new description"
+gl mr update --iid <IID> --target-branch develop
+gl mr update --iid <IID> --add-label bug --remove-label feature
+gl mr update --iid <IID> --add-reviewer jan.marsicek
+gl mr update --iid <IID> --draft    # mark as draft
+gl mr update --iid <IID> --no-draft # mark as ready (use --draft false)
+```
 
 ## Reviewer convention
 
