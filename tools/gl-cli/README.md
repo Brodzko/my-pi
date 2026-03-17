@@ -35,6 +35,8 @@ gl mr review submit --iid 42 --input review.json
 ```
 gl mr list          — List/filter merge requests
 gl mr get           — Fetch MR details (basics, changes, discussions, pipeline, approvals)
+gl mr create        — Create a merge request
+gl mr update        — Update an existing merge request (title, description, target branch, reviewers, labels, assignees, draft status)
 gl mr checkout      — Checkout MR branch locally
 gl mr note create   — Post a general comment
 gl mr note create-line — Post a line-level comment on a diff
