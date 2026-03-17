@@ -3,18 +3,23 @@
 ## Core invariants
 
 1. **Use `git` directly.** No wrapper is required.
-2. **Never push changes** unless the workflow is specifically establishing the
+2. **Never commit without explicit user approval.** The agent must never run
+   `git commit` unless the user has approved the specific commit (message +
+   files) in the current conversation turn. Proposing a commit plan is not
+   approval. The user must explicitly say yes, approve, LGTM, or equivalent.
+   When in doubt, ask.
+3. **Never push changes** unless the workflow is specifically establishing the
    upstream branch for a **newly created local branch** of the **same name**.
-3. **Do not run explicit rebases.** The agent must not execute `git rebase` or
+4. **Do not run explicit rebases.** The agent must not execute `git rebase` or
    `git rebase -i`. `git pull --rebase` is allowed as the narrow exception for
    updating branch state, but if it fails or conflicts, stop immediately and
    hand control back to the user.
-4. **Never force-delete branches** (`git branch -D`) without explicit user
+5. **Never force-delete branches** (`git branch -D`) without explicit user
    approval.
-5. **Stop immediately on conflicts.** If any git command produces merge
+6. **Stop immediately on conflicts.** If any git command produces merge
    conflicts, stop all work, report the conflicting files, and ask the user how
    to proceed.
-6. **Stop on unexpected git errors.** If a command exits non-zero for any reason
+7. **Stop on unexpected git errors.** If a command exits non-zero for any reason
    other than an explicitly anticipated case like "nothing to commit" or
    "already up to date", report the full error output and stop.
 

@@ -33,3 +33,6 @@ Before starting, read:
 - Do not open Quill spontaneously; use this only when explicitly triggered.
 - Prefer unstaged review for the agent's fresh local changes unless the user
   asked to review the staged set.
+- **Follow the review-loop critical invariants strictly**: always pause between
+  files (use `choose_options`), and stop entirely on abort. These are
+  non-negotiable even when reviewing your own work.

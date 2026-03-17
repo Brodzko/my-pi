@@ -10,6 +10,16 @@ Before starting, read:
 - `../archivist/common.md`
 - `../archivist/conventions.md`
 
+## Hard gate
+
+**Never run `git commit` without explicit user approval.** This is non-negotiable.
+
+- Proposing a commit plan does not count as approval.
+- Suggesting a checkpoint does not count as approval.
+- The user must explicitly confirm (yes / approve / LGTM / "commit it" / equivalent) before any `git commit` is executed.
+- If the user says "commit when done" or similar blanket approval, treat it as approval for the specific plan you present — still present the plan first.
+- Use `choose_options` for the approval gate when practical.
+
 ## Workflow
 
 ### Checkpoint suggestions
