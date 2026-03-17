@@ -72,6 +72,46 @@ Flags:
 - `--draft` — mark as draft
 - `--dry-run` — validate without creating
 
+### Update
+
+```bash
+# Update title
+gl mr update --iid 42 --title "fix(api): correct timeout handling"
+
+# Update description and target branch
+gl mr update --iid 42 --description "Updated description" --target-branch develop
+
+# Add reviewers and assignees
+gl mr update --iid 42 --add-reviewer jan.marsicek --add-assignee martin.brodziansky
+
+# Add/remove labels
+gl mr update --iid 42 --add-label bug --remove-label feature
+
+# Mark as draft or ready
+gl mr update --iid 42 --draft
+gl mr update --iid 42 --no-draft
+
+# Dry run
+gl mr update --iid 42 --title "new title" --dry-run
+```
+
+Flags:
+
+- `--iid` (required) — MR IID to update
+- `--title` — new MR title
+- `--description` — new MR description body
+- `--target-branch` — new target branch
+- `--add-reviewer` — comma-separated reviewer usernames to add
+- `--remove-reviewer` — comma-separated reviewer usernames to remove (limited glab support)
+- `--add-label` — comma-separated labels to add
+- `--remove-label` — comma-separated labels to remove
+- `--add-assignee` — comma-separated assignee usernames to add
+- `--remove-assignee` — comma-separated assignee usernames to remove (limited glab support)
+- `--draft` — mark as draft
+- `--no-draft` — mark as ready (pass `--draft false`)
+- `--squash` — set squash-before-merge
+- `--dry-run` — validate without updating
+
 ### Context
 
 ```bash
