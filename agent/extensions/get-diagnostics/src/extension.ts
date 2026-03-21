@@ -12,6 +12,7 @@ import type { ToolResultEvent } from '@mariozechner/pi-coding-agent';
 import { createDiagnosticsService } from './service';
 import { createTypescriptProvider } from './providers/typescript';
 import { createEslintProvider } from './providers/eslint';
+import { createOxlintProvider } from './providers/oxlint';
 import type {
   DiagnosticsProvider,
   ProviderStatusInfo,
@@ -107,7 +108,14 @@ const renderStatus = (ctx: ExtensionContext): void => {
     if (state === 'error' && detail && /not found/i.test(detail)) continue;
 
     const icon = STATUS_ICONS[state] ?? '?';
-    const label = id === 'typescript' ? 'TS' : id === 'eslint' ? 'ESLint' : id;
+    const label =
+      id === 'typescript'
+        ? 'TS'
+        : id === 'eslint'
+          ? 'ESLint'
+          : id === 'oxlint'
+            ? 'oxlint'
+            : id;
 
     const themed = ((): string => {
       switch (state) {
@@ -141,7 +149,8 @@ export default function setup(pi: ExtensionAPI): void {
 
   const tsProvider = createTypescriptProvider();
   const eslintProvider = createEslintProvider();
-  const allProviders = [tsProvider, eslintProvider];
+  const oxlintProvider = createOxlintProvider();
+  const allProviders = [tsProvider, eslintProvider, oxlintProvider];
   const filePattern = buildFilePattern(allProviders);
   const service = createDiagnosticsService(allProviders);
 
@@ -162,6 +171,7 @@ export default function setup(pi: ExtensionAPI): void {
   };
   wireStatus(tsProvider);
   wireStatus(eslintProvider);
+  wireStatus(oxlintProvider);
 
   // Background prewarm on session start — non-blocking.
   // Clear stale status first (in case a previous session's status persists).

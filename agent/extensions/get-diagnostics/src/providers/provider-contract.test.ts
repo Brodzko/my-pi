@@ -98,8 +98,30 @@ const createEslintStub = (): DiagnosticsProvider => {
   };
 };
 
+const createOxlintStub = (): DiagnosticsProvider => {
+  const supportedExtensions = [
+    'ts',
+    'tsx',
+    'js',
+    'jsx',
+    'mts',
+    'cts',
+    'mjs',
+    'cjs',
+  ] as const;
+  const extPattern = new RegExp(`\\.(${supportedExtensions.join('|')})$`);
+  return {
+    id: 'oxlint',
+    supportedExtensions,
+    proactive: true,
+    isFileSupported: f => extPattern.test(f),
+    getDiagnostics: async () => [],
+  };
+};
+
 testProviderContract('typescript', createTsStub);
 testProviderContract('eslint', createEslintStub);
+testProviderContract('oxlint', createOxlintStub);
 
 // Test the pattern derivation logic used by extension.ts
 describe('buildFilePattern (extension.ts logic)', () => {
