@@ -1,4 +1,4 @@
-export type DiagnosticsProviderId = 'typescript' | 'eslint';
+export type DiagnosticsProviderId = 'typescript' | 'eslint' | 'oxlint';
 
 export type DiagnosticSeverity = 'error' | 'warning' | 'info' | 'hint';
 

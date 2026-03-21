@@ -25,9 +25,9 @@ const GetDiagnosticsParams = Type.Object({
     })
   ),
   providers: Type.Optional(
-    Type.Array(StringEnum(['typescript', 'eslint'] as const), {
+    Type.Array(StringEnum(['typescript', 'eslint', 'oxlint'] as const), {
       description:
-        'Diagnostic providers to run. Defaults to ["typescript"]. Pass ["eslint"] for lint-only checks. Run one provider at a time — do NOT pass both together. Before calling this tool on changed files, prefer running any auto-formatter the project makes available (for example via a format script/job or a formatter such as Prettier) so diagnostics reflect the post-format state.',
+        'Diagnostic providers to run. Defaults to ["typescript"]. Pass ["eslint"] for lint-only checks, ["oxlint"] for fast Rust-based linting. Run one provider at a time — do NOT pass both together. Before calling this tool on changed files, prefer running any auto-formatter the project makes available (for example via a format script/job or a formatter such as Prettier) so diagnostics reflect the post-format state.',
     })
   ),
   timeoutMs: Type.Optional(
@@ -51,7 +51,7 @@ export const registerGetDiagnosticsTool = (
     name: 'get_diagnostics',
     label: 'Diagnostics',
     description:
-      'Get TypeScript or ESLint diagnostics for a file or directory. Returns type errors or lint violations. Faster than running tsc or eslint CLI \u2014 uses cached in-memory analysis. Use after editing files to verify changes. When the project provides an auto-formatter, run it on changed files first when appropriate (for example via a format script/job or a formatter such as Prettier) so diagnostics reflect the formatted state. Defaults to TypeScript type checking. Pass providers: ["eslint"] for lint checks. Always run one provider at a time, not both.',
+      'Get TypeScript, ESLint, or oxlint diagnostics for a file or directory. Returns type errors or lint violations. Faster than running tsc or eslint CLI \u2014 uses cached in-memory analysis. Use after editing files to verify changes. When the project provides an auto-formatter, run it on changed files first when appropriate (for example via a format script/job or a formatter such as Prettier) so diagnostics reflect the formatted state. Defaults to TypeScript type checking. Pass providers: ["eslint"] for lint checks, ["oxlint"] for fast Rust-based linting. Always run one provider at a time, not both.',
     parameters: GetDiagnosticsParams,
 
     async execute(
