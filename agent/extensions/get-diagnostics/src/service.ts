@@ -243,7 +243,12 @@ export const createDiagnosticsService = (
   // ESLint where @typescript-eslint's Program creation is expensive.
   //
   // Key: "providerId::absPath"
-  const inFlight = new Map<string, Promise<NormalizedDiagnostic[]>>();
+  type InFlightEntry = {
+    promise: Promise<NormalizedDiagnostic[]>;
+    /** File version when the check was started. */
+    version: number;
+  };
+  const inFlight = new Map<string, InFlightEntry>();
 
   const inFlightKey = (providerId: string, absPath: string): string =>
     `${providerId}::${absPath}`;
@@ -299,7 +304,7 @@ export const createDiagnosticsService = (
         inFlight.delete(key);
       });
 
-    inFlight.set(key, promise);
+    inFlight.set(key, { promise, version });
   };
 
   // --- Public API ---
@@ -403,26 +408,45 @@ export const createDiagnosticsService = (
           //    completes, we piggyback on the existing request instead of sending
           //    another one that would queue behind it in the serialized worker.
           const key = inFlightKey(provider.id, absPath);
-          const inFlightPromise = inFlight.get(key);
-          if (inFlightPromise) {
+          const inFlightEntry = inFlight.get(key);
+          if (inFlightEntry) {
+            // Check if the in-flight check was started for the current file
+            // version. If the file was edited after the check started, the
+            // in-flight version will be older — skip it and fall through to
+            // a live provider call to get fresh diagnostics.
+            const currentVersion = getVersion(absPath);
+            if (inFlightEntry.version === currentVersion) {
+              log(
+                'service',
+                `provider ${provider.id}: awaiting in-flight proactive check`,
+                {
+                  file: absPath,
+                  version: currentVersion,
+                }
+              );
+              const diagnostics = await pTimeout(inFlightEntry.promise, {
+                milliseconds: timeoutMs,
+              });
+              const ms = Date.now() - providerStart;
+              providerStatus[provider.id] = { status: 'ok', timingMs: ms };
+              log('service', `provider ${provider.id}: in-flight complete`, {
+                file: absPath,
+                ms,
+                count: diagnostics.length,
+              });
+              return diagnostics;
+            }
+
             log(
               'service',
-              `provider ${provider.id}: awaiting in-flight proactive check`,
+              `provider ${provider.id}: in-flight check is stale, falling through to live call`,
               {
                 file: absPath,
+                inFlightVersion: inFlightEntry.version,
+                currentVersion,
               }
             );
-            const diagnostics = await pTimeout(inFlightPromise, {
-              milliseconds: timeoutMs,
-            });
-            const ms = Date.now() - providerStart;
-            providerStatus[provider.id] = { status: 'ok', timingMs: ms };
-            log('service', `provider ${provider.id}: in-flight complete`, {
-              file: absPath,
-              ms,
-              count: diagnostics.length,
-            });
-            return diagnostics;
+            // Don't return — fall through to the live provider call below
           }
         }
 
