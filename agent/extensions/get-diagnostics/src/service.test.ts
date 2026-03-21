@@ -679,6 +679,51 @@ describe('createDiagnosticsService', () => {
       expect(getDiagnostics).toHaveBeenCalledTimes(1);
     });
 
+    it('getDiagnostics falls through to live call when in-flight result is stale', async () => {
+      let callCount = 0;
+      let resolveProactive!: (v: NormalizedDiagnostic[]) => void;
+      const proactivePromise = new Promise<NormalizedDiagnostic[]>(r => {
+        resolveProactive = r;
+      });
+      const getDiagnostics = vi.fn(() => {
+        callCount++;
+        if (callCount === 1) return proactivePromise;
+        return Promise.resolve([makeDiagnostic({ message: 'fresh-live' })]);
+      });
+      const provider = createMockProvider({ id: 'typescript', getDiagnostics });
+      const service = createDiagnosticsService([provider]);
+      service.prewarm('/tmp');
+
+      // syncDocument triggers proactive check (version=1)
+      service.syncDocument('/tmp/foo.ts');
+      expect(getDiagnostics).toHaveBeenCalledTimes(1);
+
+      // Start getDiagnostics — it awaits the in-flight proactive check
+      const resultPromise = service.getDiagnostics({
+        cwd: '/tmp',
+        path: '/tmp/foo.ts',
+        providers: ['typescript'],
+      });
+
+      // File is edited again while in-flight → bumps version to 2
+      service.syncDocument('/tmp/foo.ts');
+
+      // Resolve the proactive check with stale data (tagged with version=1)
+      resolveProactive([makeDiagnostic({ message: 'stale-proactive' })]);
+
+      const result = await resultPromise;
+      // Must NOT return stale data — should have fallen through to a live call
+      expect(
+        result.diagnostics.some(d => d.message === 'stale-proactive')
+      ).toBe(false);
+      expect(result.diagnostics.some(d => d.message === 'fresh-live')).toBe(
+        true
+      );
+      // Provider called: 1 for proactive, 1 for live fallback (2nd syncDocument
+      // proactive skipped since first was still in-flight at time of sync)
+      expect(getDiagnostics).toHaveBeenCalledTimes(2);
+    });
+
     it('getDiagnostics falls through to live call when no in-flight check', async () => {
       const getDiagnostics = vi.fn(async () => [
         makeDiagnostic({ message: 'live' }),
