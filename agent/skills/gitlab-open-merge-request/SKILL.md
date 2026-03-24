@@ -76,6 +76,15 @@ Follow `../gitlab/context.md`:
   exists
 - let the user override whenever reviewer choice is meaningful
 
+## Description formatting rules
+
+The `--description` value is passed directly to the CLI without shell
+interpretation. Use any markdown freely — backticks, tables, `$`, special
+characters all work as-is.
+
+- **Use actual newlines** (multi-line string), never `\n` escape sequences.
+  Escaped `\n` renders as literal `\n` in GitLab.
+
 ## Notes
 
 - Squash and source-branch deletion are already handled by the CLI defaults.

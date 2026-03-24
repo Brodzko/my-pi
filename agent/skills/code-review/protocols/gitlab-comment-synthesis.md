@@ -32,14 +32,33 @@ When synthesizing a comment:
 - prefer one direct question or observation over a mini design doc
 - drop internal review noise and preference markers
 
+## Line number fidelity
+
+When converting quill annotations to GitLab line comments, **use the exact
+`startLine` from the quill annotation output** — do not recalculate, guess, or
+approximate.
+
+Quill annotations in diff mode use new-file-side line numbers, which map
+directly to `--line N --line-type new` in `gl mr note create-line`.
+
+If a quill annotation spans a range (`startLine` ≠ `endLine`), use `startLine`
+as the line for the GitLab comment (GitLab anchors single-line comments at one
+line).
+
+Carry the exact line numbers through every step — from the quill output, through
+the comment proposal, to the final `gl` command. Do not re-derive them from
+file content or diff output.
+
 ## Process
 
 1. Filter the session down to endorsed reviewer-owned points.
 2. Group related points where appropriate.
-3. Produce a numbered comment proposal in the TUI.
+3. Produce a numbered comment proposal in the TUI — **include the exact file
+   path and line number** for each line comment so the reviewer can verify
+   placement.
 4. Wait for explicit approval or edits.
 5. Post only the exact approved text.
-   - line comments → `gl mr note create-line`
+   - line comments → `gl mr note create-line` (use exact line from annotation)
    - general comments → `gl mr note create`
 6. If there are no qualifying comments, offer to approve the MR instead.
 
