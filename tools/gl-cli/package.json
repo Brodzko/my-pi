@@ -1,6 +1,6 @@
 {
   "name": "@pi/gl-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable GitLab review CLI for agent-assisted code review workflows",
   "type": "module",
   "bin": {

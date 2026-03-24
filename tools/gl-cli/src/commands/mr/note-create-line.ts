@@ -1,21 +1,21 @@
-import { writeFileSync, unlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { defineCommand } from "citty";
-import { z } from "zod";
-import { ensureAuth } from "../../lib/auth.js";
-import { execGlabJson } from "../../lib/exec.js";
-import { encodedProject } from "../../lib/project.js";
-import { outputJson, outputError, success, log } from "../../lib/envelope.js";
-import { printSchemaAndExit } from "../../lib/schema-flag.js";
-import { GlError, ErrorCode } from "../../lib/errors.js";
-import { parseDiffVisibleRanges, isLineInRanges } from "../../lib/diff.js";
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { defineCommand } from 'citty';
+import { z } from 'zod';
+import { ensureAuth } from '../../lib/auth.js';
+import { execGlabJson } from '../../lib/exec.js';
+import { encodedProject } from '../../lib/project.js';
+import { outputJson, outputError, success, log } from '../../lib/envelope.js';
+import { printSchemaAndExit } from '../../lib/schema-flag.js';
+import { GlError, ErrorCode } from '../../lib/errors.js';
+import { parseDiffVisibleRanges, isLineInRanges } from '../../lib/diff.js';
 
 const InputSchema = z.object({
   iid: z.number().int().positive(),
   file: z.string().min(1),
   line: z.number().int().positive(),
-  lineType: z.enum(["new", "old"]),
+  lineType: z.enum(['new', 'old']),
   body: z.string().min(1),
   dryRun: z.boolean().default(false),
 });
@@ -35,104 +35,104 @@ type DiffFile = {
 
 export const noteCreateLineCommand = defineCommand({
   meta: {
-    name: "create-line",
-    description: "Create a line-level comment on a merge request diff",
+    name: 'create-line',
+    description: 'Create a line-level comment on a merge request diff',
   },
   args: {
     schema: {
-      type: "boolean",
-      description: "Print input JSON schema and exit",
+      type: 'boolean',
+      description: 'Print input JSON schema and exit',
       default: false,
     },
     iid: {
-      type: "string",
-      description: "Merge request IID (required)",
+      type: 'string',
+      description: 'Merge request IID (required)',
     },
     file: {
-      type: "string",
-      description: "File path in the diff (required)",
+      type: 'string',
+      description: 'File path in the diff (required)',
     },
     line: {
-      type: "string",
-      description: "Line number (required)",
+      type: 'string',
+      description: 'Line number (required)',
     },
-    "line-type": {
-      type: "string",
-      description: "Line type: new or old (required)",
+    'line-type': {
+      type: 'string',
+      description: 'Line type: new or old (required)',
     },
     body: {
-      type: "string",
-      description: "Comment body text (required)",
+      type: 'string',
+      description: 'Comment body text (required)',
     },
-    "dry-run": {
-      type: "boolean",
-      description: "Validate without creating",
+    'dry-run': {
+      type: 'boolean',
+      description: 'Validate without creating',
       default: false,
     },
   },
   async run({ args }) {
     try {
       if (args.schema) {
-        printSchemaAndExit(InputSchema, "MrNoteCreateLineInput");
+        printSchemaAndExit(InputSchema, 'MrNoteCreateLineInput');
       }
 
       await ensureAuth();
 
       const iid = parseInt(args.iid, 10);
       const line = parseInt(args.line, 10);
-      const lineType = args["line-type"] as "new" | "old";
+      const lineType = args['line-type'] as 'new' | 'old';
       const file = args.file;
       const body = args.body;
-      const dryRun = args["dry-run"] ?? false;
+      const dryRun = args['dry-run'] ?? false;
 
       if (isNaN(iid) || iid <= 0) {
         throw new GlError(
           ErrorCode.VALIDATION_ERROR,
-          "--iid must be a positive integer",
+          '--iid must be a positive integer'
         );
       }
       if (isNaN(line) || line <= 0) {
         throw new GlError(
           ErrorCode.VALIDATION_ERROR,
-          "--line must be a positive integer",
+          '--line must be a positive integer'
         );
       }
-      if (!["new", "old"].includes(lineType)) {
+      if (!['new', 'old'].includes(lineType)) {
         throw new GlError(
           ErrorCode.VALIDATION_ERROR,
-          "--line-type must be 'new' or 'old'",
+          "--line-type must be 'new' or 'old'"
         );
       }
       if (!file) {
-        throw new GlError(ErrorCode.VALIDATION_ERROR, "--file is required");
+        throw new GlError(ErrorCode.VALIDATION_ERROR, '--file is required');
       }
       if (!body) {
-        throw new GlError(ErrorCode.VALIDATION_ERROR, "--body is required");
+        throw new GlError(ErrorCode.VALIDATION_ERROR, '--body is required');
       }
 
       const projectId = await encodedProject();
 
       // 1. Get diff versions to resolve SHAs
       const versions = await execGlabJson(
-        ["api", `/projects/${projectId}/merge_requests/${iid}/versions`],
-        (data) => data as DiffVersion[],
+        ['api', `/projects/${projectId}/merge_requests/${iid}/versions`],
+        data => data as DiffVersion[]
       );
       const latest = versions[0];
       if (!latest) {
         throw new GlError(
           ErrorCode.UPSTREAM_ERROR,
-          "No diff versions found for this MR",
+          'No diff versions found for this MR'
         );
       }
 
       // 2. Get MR changes to find the file and validate line
       const mrChanges = await execGlabJson(
-        ["api", `/projects/${projectId}/merge_requests/${iid}/changes`],
-        (data) => data as { changes: DiffFile[] },
+        ['api', `/projects/${projectId}/merge_requests/${iid}/changes`],
+        data => data as { changes: DiffFile[] }
       );
 
       const fileChange = mrChanges.changes.find(
-        (c) => c.new_path === file || c.old_path === file,
+        c => c.new_path === file || c.old_path === file
       );
       if (!fileChange) {
         throw new GlError(
@@ -140,8 +140,8 @@ export const noteCreateLineCommand = defineCommand({
           `File "${file}" not found in MR diff`,
           {
             file,
-            availableFiles: mrChanges.changes.map((c) => c.new_path),
-          },
+            availableFiles: mrChanges.changes.map(c => c.new_path),
+          }
         );
       }
 
@@ -151,24 +151,24 @@ export const noteCreateLineCommand = defineCommand({
         throw new GlError(
           ErrorCode.LINE_NOT_IN_DIFF,
           `Line ${line} (${lineType}) is not in the diff for "${file}"`,
-          { file, line, lineType, validRanges },
+          { file, line, lineType, validRanges }
         );
       }
 
       if (dryRun) {
-        log("[gl] Dry run: would create line comment");
+        log('[gl] Dry run: would create line comment');
         outputJson(
           success(
             {
               dryRun: true,
-              would: "create_line_comment",
+              would: 'create_line_comment',
               iid,
               file,
               line,
               lineType,
             },
-            { dryRun: true },
-          ),
+            { dryRun: true }
+          )
         );
         return;
       }
@@ -177,13 +177,13 @@ export const noteCreateLineCommand = defineCommand({
       const requestBody = {
         body,
         position: {
-          position_type: "text",
+          position_type: 'text',
           base_sha: latest.base_commit_sha,
           start_sha: latest.start_commit_sha,
           head_sha: latest.head_commit_sha,
           old_path: fileChange.old_path,
           new_path: fileChange.new_path,
-          ...(lineType === "new" ? { new_line: line } : { old_line: line }),
+          ...(lineType === 'new' ? { new_line: line } : { old_line: line }),
         },
       };
 
@@ -194,16 +194,16 @@ export const noteCreateLineCommand = defineCommand({
       try {
         result = await execGlabJson(
           [
-            "api",
+            'api',
             `/projects/${projectId}/merge_requests/${iid}/discussions`,
-            "-X",
-            "POST",
-            "-H",
-            "Content-Type: application/json",
-            "--input",
+            '-X',
+            'POST',
+            '-H',
+            'Content-Type: application/json',
+            '--input',
             tmpFile,
           ],
-          (data) => data as { id: string; notes: { id: number }[] },
+          data => data as { id: string; notes: { id: number }[] }
         );
       } finally {
         try {
@@ -220,7 +220,7 @@ export const noteCreateLineCommand = defineCommand({
           file,
           line,
           lineType,
-        }),
+        })
       );
     } catch (err) {
       outputError(err);

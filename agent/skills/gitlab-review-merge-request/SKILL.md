@@ -23,10 +23,13 @@ separate review workflow skill for the file-by-file review itself.
 gl mr list --reviewer @me --state opened
 ```
 
-2. **Fetch details.** Read the MR with:
+2. **Fetch details.** Read the MR with `--include` specifying only the sections
+   you need (prefer this over `--full`):
 
 ```bash
-gl mr get --iid N --include basics,changes,discussions,pipeline,approvals
+gl mr get --iid N --include basics,discussions
+gl mr get --iid N --include basics,changes
+gl mr get --iid N --include basics,pipeline,approvals
 ```
 
 3. **Choose the next action.** Depending on user intent:
@@ -48,9 +51,13 @@ git branch --set-upstream-to=origin/<branch-name>
 6. **Hand off to code review** when the task is a substantive file review:
    - use `review-merge-request` for the Quill/session workflow
    - keep this skill focused on GitLab fetch/checkout/posting concerns
-7. **Post comments only after approval.** If review output needs to become GitLab
+7. **After addressing review comments:** Make the code changes, show them to the
+   user, and **wait for explicit approval before committing, pushing, or
+   replying to threads.** Never auto-commit, auto-push, or auto-reply.
+8. **Post comments only after approval.** If review output needs to become GitLab
    comments, follow `../code-review/protocols/gitlab-comment-synthesis.md`.
-8. **Approve only when clean.** Use `gl mr approve --iid N` only after the user
+   Never reply to MR discussions without the user's explicit go-ahead.
+9. **Approve only when clean.** Use `gl mr approve --iid N` only after the user
    confirms there are no remaining concerns to post.
 
 ## Direct actions

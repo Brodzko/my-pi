@@ -7,17 +7,17 @@ export type ValidRange = { start: number; end: number };
  */
 export const parseDiffLineRanges = (
   diff: string,
-  lineType: "new" | "old",
+  lineType: 'new' | 'old'
 ): ValidRange[] => {
   const ranges: ValidRange[] = [];
-  const lines = diff.split("\n");
+  const lines = diff.split('\n');
   let newLine = 0;
   let oldLine = 0;
   let rangeStart: number | null = null;
 
   const closeRange = () => {
     if (rangeStart !== null) {
-      const end = lineType === "new" ? newLine - 1 : oldLine - 1;
+      const end = lineType === 'new' ? newLine - 1 : oldLine - 1;
       if (end >= rangeStart) {
         ranges.push({ start: rangeStart, end });
       }
@@ -34,13 +34,13 @@ export const parseDiffLineRanges = (
       continue;
     }
 
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      if (lineType === "new" && rangeStart === null) rangeStart = newLine;
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      if (lineType === 'new' && rangeStart === null) rangeStart = newLine;
       newLine++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      if (lineType === "old" && rangeStart === null) rangeStart = oldLine;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      if (lineType === 'old' && rangeStart === null) rangeStart = oldLine;
       oldLine++;
-    } else if (!line.startsWith("\\")) {
+    } else if (!line.startsWith('\\')) {
       closeRange();
       newLine++;
       oldLine++;
@@ -64,15 +64,15 @@ export const parseDiffLineRanges = (
  */
 export const parseDiffVisibleRanges = (
   diff: string,
-  lineType: "new" | "old",
+  lineType: 'new' | 'old'
 ): ValidRange[] => {
   const ranges: ValidRange[] = [];
-  const lines = diff.split("\n");
+  const lines = diff.split('\n');
   let newLine = 0;
   let oldLine = 0;
   let hunkStart: number | null = null;
 
-  const tracker = () => (lineType === "new" ? newLine : oldLine);
+  const tracker = () => (lineType === 'new' ? newLine : oldLine);
 
   const closeHunk = () => {
     if (hunkStart !== null) {
@@ -94,11 +94,11 @@ export const parseDiffVisibleRanges = (
       continue;
     }
 
-    if (line.startsWith("+") && !line.startsWith("+++")) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
       newLine++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
       oldLine++;
-    } else if (!line.startsWith("\\")) {
+    } else if (!line.startsWith('\\')) {
       newLine++;
       oldLine++;
     }
@@ -109,12 +109,12 @@ export const parseDiffVisibleRanges = (
 };
 
 export const isLineInRanges = (line: number, ranges: ValidRange[]): boolean =>
-  ranges.some((r) => line >= r.start && line <= r.end);
+  ranges.some(r => line >= r.start && line <= r.end);
 
 export const isLineInDiff = (
   diff: string,
   line: number,
-  lineType: "new" | "old",
+  lineType: 'new' | 'old'
 ): boolean => {
   const ranges = parseDiffLineRanges(diff, lineType);
   return isLineInRanges(line, ranges);
@@ -128,7 +128,7 @@ export const isLineInDiff = (
 export const isLineVisibleInDiff = (
   diff: string,
   line: number,
-  lineType: "new" | "old",
+  lineType: 'new' | 'old'
 ): boolean => {
   const ranges = parseDiffVisibleRanges(diff, lineType);
   return isLineInRanges(line, ranges);
