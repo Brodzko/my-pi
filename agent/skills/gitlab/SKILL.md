@@ -36,6 +36,7 @@ Use direct `gl` commands for simple deterministic actions:
 - `gl mr get --iid N --include basics,changes,discussions,pipeline,approvals`
 - `gl mr note create --iid N --body "..."`
 - `gl mr note create-line --iid N --file path --line 10 --line-type new --body "..."`
+- `gl mr note edit --iid N --note-id ID --body "updated text"`
 - `gl mr discussion reply --iid N --discussion-id abc123 --body "..."`
 - `gl mr discussion resolve --iid N --discussion-id abc123`
 - `gl mr update --iid N --title "..." --description "..." --target-branch develop`

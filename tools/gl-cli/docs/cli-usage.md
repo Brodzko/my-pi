@@ -134,8 +134,14 @@ gl mr note create --iid 42 --body "Overall LGTM"
 # Deduplicated note (skip if identical body exists)
 gl mr note create --iid 42 --body "LGTM" --unique
 
-# Line comment (SHAs auto-resolved)
+# Line comment (SHAs auto-resolved, works on any line visible in the diff — context or changed)
 gl mr note create-line --iid 42 --file src/parser.ts --line 84 --line-type new --body "Extract this?"
+
+# Edit an existing note (works for both general notes and discussion notes)
+gl mr note edit --iid 42 --note-id 123456 --body "Updated comment text"
+
+# Dry run
+gl mr note edit --iid 42 --note-id 123456 --body "Updated" --dry-run
 ```
 
 ### Discussions
@@ -204,6 +210,33 @@ gl mr get --iid 42 --include discussions | jq '.data.discussions[] | select(.res
 # Added files
 gl mr get --iid 42 --include changes | jq '.data.changes[] | select(.changeType == "added") | .newPath'
 ```
+
+### CI Config
+
+```bash
+# Print the final merged CI/CD configuration for the current project
+gl ci config
+```
+
+Returns the fully merged `.gitlab-ci.yml` after all includes are resolved.
+
+### CI Lint
+
+```bash
+# Validate the project .gitlab-ci.yml
+gl ci lint
+
+# Validate with merged YAML included in response
+gl ci lint --dry-run
+
+# Lint arbitrary YAML content
+gl ci lint --content "stages: [build, test]\nbuild:\n  script: echo hello"
+```
+
+Flags:
+
+- `--content` — raw YAML string to lint instead of the project `.gitlab-ci.yml`
+- `--dry-run` — include merged YAML in the response
 
 ## Debug
 

@@ -1,29 +1,31 @@
-import { defineCommand } from 'citty';
-import { listCommand } from './list.js';
-import { getCommand } from './get.js';
-import { createCommand } from './create.js';
-import { updateCommand } from './update.js';
-import { checkoutCommand } from './checkout.js';
-import { noteCreateCommand } from './note-create.js';
-import { noteCreateLineCommand } from './note-create-line.js';
+import { defineCommand } from "citty";
+import { listCommand } from "./list.js";
+import { getCommand } from "./get.js";
+import { createCommand } from "./create.js";
+import { updateCommand } from "./update.js";
+import { checkoutCommand } from "./checkout.js";
+import { noteCreateCommand } from "./note-create.js";
+import { noteCreateLineCommand } from "./note-create-line.js";
+import { noteEditCommand } from "./note-edit.js";
 import {
   discussionReplyCommand,
   discussionResolveCommand,
   discussionUnresolveCommand,
-} from './discussion.js';
-import { approveCommand, unapproveCommand } from './approve.js';
-import { reviewSubmitCommand } from './review-submit.js';
+} from "./discussion.js";
+import { approveCommand, unapproveCommand } from "./approve.js";
+import { reviewSubmitCommand } from "./review-submit.js";
 
 const noteCommand = defineCommand({
-  meta: { name: 'note', description: 'Manage MR notes' },
+  meta: { name: "note", description: "Manage MR notes" },
   subCommands: {
     create: noteCreateCommand,
-    'create-line': noteCreateLineCommand,
+    "create-line": noteCreateLineCommand,
+    edit: noteEditCommand,
   },
 });
 
 const discussionCommand = defineCommand({
-  meta: { name: 'discussion', description: 'Manage MR discussions' },
+  meta: { name: "discussion", description: "Manage MR discussions" },
   subCommands: {
     reply: discussionReplyCommand,
     resolve: discussionResolveCommand,
@@ -32,14 +34,14 @@ const discussionCommand = defineCommand({
 });
 
 const reviewCommand = defineCommand({
-  meta: { name: 'review', description: 'Batch review operations' },
+  meta: { name: "review", description: "Batch review operations" },
   subCommands: {
     submit: reviewSubmitCommand,
   },
 });
 
 export const mrCommand = defineCommand({
-  meta: { name: 'mr', description: 'Manage merge requests' },
+  meta: { name: "mr", description: "Manage merge requests" },
   subCommands: {
     list: listCommand,
     get: getCommand,

@@ -88,6 +88,7 @@ gl mr update --iid 42 --dry-run       # preview without executing
 ```bash
 gl mr note create --iid 42 --body "LGTM"
 gl mr note create-line --iid 42 --file src/x.ts --line 10 --line-type new --body "Nit: rename"
+gl mr note edit --iid 42 --note-id 123456 --body "Updated comment"
 gl mr discussion reply --iid 42 --discussion-id abc123 --body "Fixed"
 gl mr discussion resolve --iid 42 --discussion-id abc123
 ```
