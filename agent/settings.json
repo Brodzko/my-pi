@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.61.1",
+  "lastChangelogVersion": "0.62.0",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-4-6",
   "enabledModels": [
@@ -17,5 +17,8 @@
     "~/rossum/coding-agents/pi/extensions",
     "./extensions/sessions"
   ],
-  "skills": ["~/rossum/coding-agents/pi/skills", "./skills"]
+  "skills": [
+    "~/rossum/coding-agents/pi/skills",
+    "./skills"
+  ]
 }
