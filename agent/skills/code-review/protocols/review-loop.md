@@ -98,12 +98,16 @@ abort. Err on the side of stopping.
 
 ## Between-file confirmation
 
-After every approved file, or denied-then-reapproved cycle, you **must** pause
-and ask using `choose_options` with **three options**:
+After every approved file, or denied-then-reapproved cycle, you **must**:
 
-1. **Continue** — open the next file in the walk
-2. **Stop & synthesize** — end the walk and run session synthesis
-3. **Pause — I have a question / instruction** — stop the walk and hand control
+1. **Report progress.** Before the prompt, print a short progress line showing
+   the current position and total, e.g. `✔ 3/10 — src/utils/parse.ts`. This
+   lets the user know where they are in the walk at a glance.
+2. **Ask to continue** using `choose_options` with **three options**:
+
+   - **Continue** — open the next file in the walk
+   - **Stop & synthesize** — end the walk and run session synthesis
+   - **Pause — I have a question / instruction** — stop the walk and hand control
    back to the user in the TUI. The user may ask questions, give instructions,
    request code changes, or discuss what they've seen so far. After the
    conversation resolves, ask the same three-option question again to let the

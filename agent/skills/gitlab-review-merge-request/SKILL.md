@@ -42,23 +42,37 @@ gl mr get --iid N --include basics,pipeline,approvals
 gl mr checkout --iid N
 ```
 
-5. **Verify tracking.** If checkout did not configure upstream tracking, run:
+5. **Ensure the MR branch tracks its remote and is up to date.**
 
 ```bash
-git branch --set-upstream-to=origin/<branch-name>
+git branch --set-upstream-to=origin/<source-branch>
+git pull --ff-only
 ```
 
-6. **Hand off to code review** when the task is a substantive file review:
+   If `--ff-only` fails (local commits diverged), stop and tell the user rather
+   than force-pulling or rebasing silently.
+
+6. **Ensure the target branch is up to date** so diffs and merge-base are
+   accurate:
+
+```bash
+git fetch origin <target-branch>
+```
+
+   Do **not** check out the target branch — a fetch is enough. The target branch
+   name is available from the MR metadata fetched in step 2.
+
+7. **Hand off to code review** when the task is a substantive file review:
    - use `review-merge-request` for the Quill/session workflow
    - keep this skill focused on GitLab fetch/checkout/posting concerns
-7. **After addressing review comments:** Make the code changes, show them to the
+8. **After addressing review comments:** Make the code changes, show them to the
    user, and **wait for explicit approval before committing, pushing, or
    replying to threads.** Never auto-commit, auto-push, or auto-reply.
-8. **Post comments only after approval.** If review output needs to become GitLab
+9. **Post comments only after approval.** If review output needs to become GitLab
    comments, follow `../code-review/protocols/gitlab-comment-synthesis.md`.
    Never reply to MR discussions without the user's explicit go-ahead.
-9. **Approve only when clean.** Use `gl mr approve --iid N` only after the user
-   confirms there are no remaining concerns to post.
+10. **Approve only when clean.** Use `gl mr approve --iid N` only after the user
+    confirms there are no remaining concerns to post.
 
 ## Direct actions
 
