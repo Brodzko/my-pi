@@ -28,6 +28,9 @@ Rules:
 - description is lowercase
 - use imperative mood
 - no trailing period
+- **never include ticket IDs** (e.g. `PROJ-123`) in commit messages — they
+  cause unnecessary notifications in issue trackers. Ticket IDs belong in branch
+  names only.
 
 Examples:
 
