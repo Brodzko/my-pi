@@ -1,5 +1,11 @@
 # Global Agent Instructions
 
+<!-- ====================================================================
+     PORTABLE: Everything below until the next PI-SPECIFIC marker is
+     agent-agnostic and can be copied to any agent config (e.g. CLAUDE.md)
+     without modification.
+     ==================================================================== -->
+
 ## About Me
 
 Senior frontend engineer. TypeScript and React. I care deeply about clean,
@@ -21,14 +27,39 @@ For major or high-risk tasks (or when review/approval is needed before implement
 2. Propose a short plan (2-5 steps) before making edits.
 3. Ask for review/approval if requested or implied by the task.
 4. Execute incrementally in small, reviewable changes.
-5. Verify: after each meaningful edit, run any project-available auto-formatter on the touched files first when appropriate, then run `get_diagnostics` on every touched file for immediate feedback, and actively address diagnostics before moving on. Treat diagnostics as blocking unless they are explicitly accepted as out-of-scope by the user. Detect formatter availability from the project itself (for example via `format`/formatter scripts or jobs, with Prettier as a common example); if formatting issues are auto-fixable, prefer fixing them before diagnostics so type/lint output reflects the post-format state. **Always run one provider at a time** — default to TypeScript (`providers: ["typescript"]` or omit the param). Run ESLint (`providers: ["eslint"]`) as a separate pass when lint feedback is requested/expected; if ESLint reports issues in changed code, attempt fixes before continuing. Never pass both providers together. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration — reserve those for final verification only.
+5. Verify: after each meaningful edit, run any project-available auto-formatter
+   on the touched files first when appropriate, then **check types and lint** on
+   every touched file for immediate feedback, and actively address diagnostics
+   before moving on. Treat diagnostics as blocking unless they are explicitly
+   accepted as out-of-scope by the user. Detect formatter availability from the
+   project itself (for example via `format`/formatter scripts or jobs, with
+   Prettier as a common example); if formatting issues are auto-fixable, prefer
+   fixing them before diagnostics so type/lint output reflects the post-format
+   state. Do **not** run project-wide `tsc`/`eslint`/`lint` during iteration —
+   reserve those for final verification only.
 6. Reflect briefly on uncertainty, failed attempts, and what should be reused.
 
 For minor, low-risk tasks, proceed directly without mandatory upfront plan approval.
 
+<!-- PI-SPECIFIC: Verification tool bindings for step 5 above.
+     In pi, use `get_diagnostics` with provider separation:
+     - Default to TypeScript (`providers: ["typescript"]` or omit the param).
+     - Run ESLint (`providers: ["eslint"]`) as a separate pass when lint
+       feedback is requested/expected.
+     - Never pass both providers together.
+     In Claude Code, use the built-in IDE diagnostics (VS Code integration)
+     or fall back to `tsc --noEmit` / `npx eslint <file>` via Bash.
+-->
+
 ## Continuous Learning
 
-Primary memory is **per-project** and must be proactively maintained in the **project root** (the repository root where this AGENTS file lives), not in nested package/feature directories:
+<!-- The memory protocol is documented in full in docs/memory-protocol.md.
+     The content below is the live version consumed by the agent. Both files
+     should stay in sync. -->
+
+Primary memory is **per-project** and must be proactively maintained in the
+**project root** (the repository root where this AGENTS file lives), not in
+nested package/feature directories:
 
 - Directory: `<project-root>/.brodzko/memory/`
 - Never create `.brodzko/memory/` inside subdirectories (for example `agent/extensions/*/.brodzko/memory`)
@@ -39,6 +70,8 @@ At the start of each task, do targeted retrieval from:
 
 1. Project memory: `<project-root>/.brodzko/memory/**/*.md` (primary)
 2. Global memory (fallback):
+   <!-- PI-SPECIFIC: These paths are pi layout. For Claude Code, use
+        ~/.claude/CLAUDE.md or equivalent global memory location. -->
    - `~/.pi/agent/LEARNINGS.md`
    - `~/.pi/agent/ANTI_PATTERNS.md`
    - `~/.pi/agent/DECISIONS.md`
@@ -200,10 +233,16 @@ If verification fails:
 
 - [ ] Goal implemented as requested
 - [ ] Scope respected (no unrelated refactors)
-- [ ] `get_diagnostics` run on all touched files (final pass), and reported diagnostics in changed scope are fixed or explicitly called out/accepted
+- [ ] Type check and lint run on all touched files (final pass), and reported
+      diagnostics in changed scope are fixed or explicitly called out/accepted
+      <!-- PI-SPECIFIC: Use `get_diagnostics` tool. In Claude Code, use IDE
+           diagnostics or `tsc --noEmit` / `npx eslint` via Bash. -->
 - [ ] Relevant tests run, or explicitly called out as not run
 - [ ] Risks, assumptions, and follow-ups stated clearly
-- [ ] Reusable lesson captured in `.brodzko/memory/` (project) when applicable; promote to `~/.pi/agent/LEARNINGS.md` only if cross-project
+- [ ] Reusable lesson captured in `.brodzko/memory/` (project) when applicable;
+      promote to global memory only if cross-project
+      <!-- PI-SPECIFIC: Global memory lives at `~/.pi/agent/LEARNINGS.md`.
+           In Claude Code, use `~/.claude/CLAUDE.md` or similar. -->
 
 ## Communication
 
