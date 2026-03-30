@@ -23,7 +23,6 @@
   },
   "pi": {
     "extensions": [
-      "./session-index/src/index.ts",
       "./session-query/src/index.ts",
       "./session-reference/src/index.ts",
       "./session-name-widget/src/index.ts",
