@@ -1,1 +1,0 @@
-/Users/martin.brodziansky@rossum.ai/agent-config/AGENTS.md
