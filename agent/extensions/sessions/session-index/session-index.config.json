@@ -1,7 +1,0 @@
-{
-  "commandName": "index-session",
-  "statusKey": "index-session",
-  "minNewUserMessages": 5,
-  "notificationAutoClearMs": 2000,
-  "modelKeys": ["claude-haiku-4-5", "openai-codex/gpt-5.1"]
-}

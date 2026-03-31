@@ -1,7 +1,0 @@
-{
-  "enabled": true,
-  "statusKey": "session-notify",
-  "notificationAutoClearMs": 4000,
-  "soundMode": "auto",
-  "bellCount": 1
-}
