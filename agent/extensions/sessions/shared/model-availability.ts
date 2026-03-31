@@ -4,6 +4,7 @@ import type { Api, Model } from '@mariozechner/pi-ai';
 export type ConfiguredTextModel = {
   model: Model<Api>;
   apiKey?: string;
+  headers?: Record<string, string>;
 };
 
 export type TextModelAvailability = {
@@ -43,10 +44,12 @@ export const resolveTextModelAvailability = async (
     };
   }
 
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(selectedModel);
+
   return {
     selected: {
       model: selectedModel,
-      apiKey: await ctx.modelRegistry.getApiKey(selectedModel),
+      ...(auth.ok ? { apiKey: auth.apiKey, headers: auth.headers } : {}),
     },
     missingModelKeys,
   };

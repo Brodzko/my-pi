@@ -30,6 +30,7 @@ export type HandoffGenerateAttempt = {
 type GenerateHandoffSummaryParams = {
   model: Model<Api>;
   apiKey?: string;
+  headers?: Record<string, string>;
   context: HandoffContextPayload;
   cwd: string;
   onAttempt: (attempt: HandoffGenerateAttempt) => void;
@@ -110,6 +111,7 @@ Return exactly one valid JSON object matching the schema.`;
 export const generateHandoffSummary = async ({
   model,
   apiKey,
+  headers,
   context,
   cwd,
   onAttempt,
@@ -147,7 +149,7 @@ export const generateHandoffSummary = async ({
             },
           ],
         },
-        apiKey ? { apiKey } : undefined
+        apiKey || headers ? { apiKey, headers } : undefined
       );
     } catch (error) {
       const message = toErrorMessage(error, 'Unknown handoff model error');

@@ -153,6 +153,7 @@ const runIndexing = async (
       sessionId,
       model: configuredModel.model,
       apiKey: configuredModel.apiKey,
+      headers: configuredModel.headers,
       onStatus: message =>
         statusController.setStatus(ctx, 'dim', message, false),
       onAttempt: attempt => appendTelemetryEntry(pi, attempt),

@@ -188,8 +188,11 @@ export const generateQueryAnswer = async ({
               },
             ],
           },
-          configuredModel.apiKey
-            ? { apiKey: configuredModel.apiKey }
+          configuredModel.apiKey || configuredModel.headers
+            ? {
+                apiKey: configuredModel.apiKey,
+                headers: configuredModel.headers,
+              }
             : undefined
         ),
         config.timeoutMs

@@ -41,6 +41,7 @@ type GenerateSessionMetaParams = {
   sessionId: string;
   model: Model<Api>;
   apiKey?: string;
+  headers?: Record<string, string>;
   onStatus: (status: string) => void;
   onAttempt: (attempt: GenerateAttempt) => void;
 };
@@ -97,6 +98,7 @@ export const generateSessionMeta = async ({
   sessionId,
   model,
   apiKey,
+  headers,
   onStatus,
   onAttempt,
 }: GenerateSessionMetaParams): Promise<GenerateSessionMetaResult> => {
@@ -135,7 +137,7 @@ export const generateSessionMeta = async ({
             },
           ],
         },
-        apiKey ? { apiKey } : undefined
+        apiKey || headers ? { apiKey, headers } : undefined
       );
     } catch (error) {
       const errorMessage = toErrorMessage(error, 'Unknown model error');

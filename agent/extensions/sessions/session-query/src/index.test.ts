@@ -22,7 +22,11 @@ const createCtx = (): ExtensionContext =>
     },
     modelRegistry: {
       getAvailable: () => [],
-      getApiKey: async () => undefined,
+      getApiKeyAndHeaders: async () => ({
+        ok: true,
+        apiKey: undefined,
+        headers: undefined,
+      }),
     },
   }) as unknown as ExtensionContext;
 

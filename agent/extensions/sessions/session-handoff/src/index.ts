@@ -403,6 +403,7 @@ const runHandoff = async (
     const generated = await generateHandoffSummary({
       model: configuredModel.model,
       apiKey: configuredModel.apiKey,
+      headers: configuredModel.headers,
       context: payload,
       cwd: ctx.cwd,
       onStatus: message =>
